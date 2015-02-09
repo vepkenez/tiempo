@@ -1,4 +1,25 @@
-import six
+from .contrib.django.utils import six
+
+from tiempo.conf import TASK_PATHS
+
+import chalk
+import importlib
+import os
+
+
+def import_tasks():
+    for app in TASK_PATHS:
+        if not app.split('.')[-1] == 'tasks':
+            module = importlib.import_module(app)
+            filename = os.path.join(module.__path__[0], 'tasks.py')
+            if not os.path.isfile(filename):
+                chalk.yellow(app + ' does not have a tasks module.')
+                continue
+            else:
+                app = app + '.tasks'
+
+        chalk.blue(app.upper() + ': imported tasks from %s' % app)
+        importlib.import_module(app)
 
 
 # /////////////////////////////////////////////////////////////////////////////

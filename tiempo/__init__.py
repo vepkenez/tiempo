@@ -1,3 +1,4 @@
+PROJECT_PATH = __path__[0]
 
 TIEMPO_REGISTRY = {}
 

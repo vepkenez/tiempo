@@ -1,6 +1,6 @@
 
 import time
-from .task import task
+from tiempo.task import task
 
 
 @task(periodic=True)

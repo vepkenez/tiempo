@@ -1,9 +1,16 @@
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 try:
     from django.conf import settings
     has_django = True
-except ImportError:
-    import os.environ as env
+except (ImportError, Exception), e:
+    logger.warning(str(e))
+    from os import environ as env
     has_django = False
+
+import json
 
 
 if has_django:
@@ -29,3 +36,5 @@ else:
     REDIS_PORT = env.get('TIEMPO_REDIS_PORT', 6379)
     REDIS_QUEUE_DB = env.get('TIEMPO_REDIS_QUEUE_DB', 12)
     REDIS_PW = env.get('TIEMPO_REDIS_PW', None)
+
+TASK_PATHS = json.loads(env.get('TIEMPO_TASK_PATHS', '["tiempo.demo"]'))
