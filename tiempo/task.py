@@ -19,19 +19,20 @@ from logging import getLogger
 logger = getLogger(__name__)
 
 import redis
+
 REDIS = redis.StrictRedis(
-                      host=settings.REDIS_HOST,
-                      port=settings.REDIS_PORT,
-                      db=settings.REDIS_QUEUE_DB,
-                      password=settings.REDIS_PW
-                      )
+    host=settings.REDIS_HOST,
+    port=settings.REDIS_PORT,
+    db=settings.REDIS_QUEUE_DB,
+    password=settings.REDIS_PW
+)
 
 
 class TaskBase(object):
 
     @property
     def html(self):
-        return '<task>%s</task>'%self.uid
+        return '<task>%s</task>' % self.uid
 
     @classmethod
     def _encode(cls, dictionary):
@@ -56,10 +57,9 @@ class TaskBase(object):
             # these happen, just return an empty dictionary (an empty session).
             return {}
 
-    
     @staticmethod
     def rehydrate(base_64):
-        
+
         d = Task._decode(base_64)
 
         module = importlib.import_module(d['function_module_path'])
@@ -71,14 +71,12 @@ class TaskBase(object):
 
 class Task(TaskBase):
 
-
     def __repr__(self):
         return self.key
 
     def __init__(self, *args, **kwargs):
 
         self.groups = ['ALL']
-
 
         self.day = None
         self.hour = None
@@ -96,8 +94,6 @@ class Task(TaskBase):
         for key, val in kwargs.items():
             setattr(self, key, val)
 
-
-
     def __call__(self, *args, **kwargs):
 
         # we only want this to happen if this is being called
@@ -106,13 +102,14 @@ class Task(TaskBase):
         if args and hasattr(args[0], '__call__'):
             self.func = args[0]
             self.cache = {}
-            functools.update_wrapper(self, self.func) 
-            self.key = inspect.getmodule(self.func).__name__ + '.' + self.func.__name__
+            functools.update_wrapper(self, self.func)
+            self.key = '%s.%s' % (
+                inspect.getmodule(self.func).__name__, self.func.__name__
+            )
             TIEMPO_REGISTRY[self.key] = self
             return self
 
         return self
-
 
     def _freeze(self, *args, **kwargs):
 
@@ -129,7 +126,7 @@ class Task(TaskBase):
         return self.data
 
     def _thaw(self, data=None):
-        if not data and hasattr(self,'data'):
+        if not data and hasattr(self, 'data'):
             data = self.data
 
         if data:
@@ -150,13 +147,11 @@ class Task(TaskBase):
             return obj.func
         return obj
 
-
     def _enqueue(self):
-        """
-
-        """
         if not self.frozen:
-            raise ImproperlyConfigured('need to freeze this task before enqueuing')
+            raise ImproperlyConfigured(
+                'need to freeze this task before enqueuing'
+            )
 
         d = self._encode(self.data)
         REDIS.rpush(self.group, d)
@@ -169,15 +164,14 @@ class Task(TaskBase):
                 '*',
                 '*'
             ]
-            for i,inc in enumerate(['day', 'hour', 'minute']):
+            for i, inc in enumerate(['day', 'hour', 'minute']):
                 attr = getattr(self, inc, None)
                 if attr is not None:
                     if attr != '*':
-                        attr = '%02d'%int(attr)
+                        attr = '%02d' % int(attr)
                     sched[i] = attr
 
             return '.'.join(sched)
-
 
     def run(self):
         """
@@ -188,7 +182,6 @@ class Task(TaskBase):
             *getattr(self, 'args_to_function', ()),
             **getattr(self, 'kwargs_to_function', {})
         )
-
 
     def soon(self, *args, **kwargs):
         """
@@ -201,7 +194,6 @@ class Task(TaskBase):
         self._freeze(*args, **kwargs)
         self._enqueue()
         return self
-
 
     def now(self, *args, **kwargs):
         """
