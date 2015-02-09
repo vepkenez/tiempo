@@ -96,6 +96,7 @@ class Task(TaskBase):
         # we only want this to happen if this is being called
         # as a decorator, otherwise all "calls" are performed as
         # special functions ie. "now" or "soon" etc.
+        
         if args and hasattr(args[0], '__call__'):
             self.func = args[0]
             self.cache = {}
@@ -109,7 +110,9 @@ class Task(TaskBase):
         return self
 
     def _freeze(self, *args, **kwargs):
-
+        """
+            formats all the info needed to run or pickle this task.
+        """
         self.data = {
             'function_module_path': inspect.getmodule(self.func).__name__,
             'function_name': self.func.__name__,
@@ -123,6 +126,9 @@ class Task(TaskBase):
         return self.data
 
     def _thaw(self, data=None):
+        """
+           just assigns all frozen variables to the instance
+        """
         if not data and hasattr(self, 'data'):
             data = self.data
 
@@ -131,6 +137,9 @@ class Task(TaskBase):
                 setattr(self, key, val)
 
     def _get_function(self):
+        """
+            gets the function that needs to be run to execute this task
+        """
         if hasattr(self, 'func'):
             return self.func
 
@@ -145,6 +154,9 @@ class Task(TaskBase):
         return obj
 
     def _enqueue(self):
+        """
+            pushes this task, encoded, to redis so it can be executed by a worker thread
+        """
         if not self.frozen:
             raise ImproperlyConfigured(
                 'need to freeze this task before enqueuing'
