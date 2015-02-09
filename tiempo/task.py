@@ -53,9 +53,6 @@ class TaskBase(object):
 
         except Exception:
             raise
-            # ValueError, SuspiciousOperation, unpickling exceptions. If any of
-            # these happen, just return an empty dictionary (an empty session).
-            return {}
 
     @staticmethod
     def rehydrate(base_64):
@@ -158,6 +155,11 @@ class Task(TaskBase):
         return self.data['uid']
 
     def get_schedule(self):
+        """
+           returns something that looks like 4.*.* or *.*.4
+           the 1st would mean run every hour, every minute if it is the 4th day of the month.
+           the 2nd would mean run the 4th minute of every hour, every day
+        """
         if self.periodic:
             sched = [
                 '*',
