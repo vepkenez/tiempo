@@ -29,5 +29,5 @@ setup(
     ],
     keywords=['twisted', 'tasks', 'redis', 'scheduling'],
     install_requires=readlines('requirements.txt'),
-    extras_require={'dev': ['ipdb', ]}
+    extras_require={'dev': ['ipdb', ], 'django': ['django', ]}
 )

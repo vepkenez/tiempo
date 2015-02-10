@@ -1,6 +1,6 @@
 twisted
 redis
-django
 python-dateutil
 pychalk
 jinja2
+pytz
