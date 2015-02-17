@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block css %}
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-sm-12 text-center">
+            <h1>Tiempo Dashboard</h1>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-6">
+            <ul class="list-group">
+            {% for item in data %}
+                <li class="list-group-item">{{item.datetime}}: <a href="/tiempo/{{item.uid}}">{{item.taskname}}</a></li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

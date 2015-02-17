@@ -21,6 +21,7 @@ setup(
     packages=find_packages(exclude=["tests*", ]),
     url="https://github.com/hangarunderground/tiempo",
     description="Twisted task scheduling for django",
+    scripts=['tiempo/scripts/metronome', ],
     classifiers=[
         'Intended Audience :: Developers',
         'Natural Language :: English',
@@ -29,5 +30,5 @@ setup(
     ],
     keywords=['twisted', 'tasks', 'redis', 'scheduling'],
     install_requires=readlines('requirements.txt'),
-    extras_require={'dev': ['ipdb', ]}
+    extras_require={'dev': ['ipdb', ], 'django': ['django', ]}
 )

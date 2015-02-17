@@ -1,0 +1,17 @@
+#!/usr/bin/env python -t
+
+from tiempo.web.service import Service
+from tiempo.dashboard import root
+from tiempo.execution import thread_init
+from tiempo.utils import import_tasks
+from twisted.internet import reactor
+
+
+if __name__ == '__main__':
+
+    thread_init()
+    import_tasks()
+
+    service = Service(root, 3333)
+    service.startService()
+    reactor.run()
