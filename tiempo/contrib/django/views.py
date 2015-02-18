@@ -1,6 +1,7 @@
 
 from datetime import datetime
 from tiempo.execution import REDIS, RECENT_KEY
+from tiempo import conf as tiemposettings
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
@@ -12,6 +13,27 @@ import dateutil.parser
 
 utc = pytz.timezone('UTC')
 local = pytz.timezone("America/New_York")
+
+
+
+
+@login_required
+def dashboard(request):
+
+    queue_length = [
+        {
+        'name': t, 
+        'length': REDIS.llen(t),
+        'last': REDIS.get('last_finished_%s'%t),
+        }
+        for t in tiemposettings.TASK_GROUPS
+    ]
+
+
+    response = render(request, 'tiempo/dashboard.html', {
+        'queue_info': queue_length
+    })
+    return response
 
 
 @login_required

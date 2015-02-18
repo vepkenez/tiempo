@@ -19,6 +19,7 @@ import uuid
 import base64
 import importlib
 import functools
+import datetime
 
 
 logger = getLogger(__name__)
@@ -173,6 +174,7 @@ class Task(TaskBase):
         """
             runs this task right now
         """
+        self.start_time = datetime.datetime.now()
         func = self._get_function()
         func(
             *getattr(self, 'args_to_function', ()),
@@ -198,6 +200,22 @@ class Task(TaskBase):
         self._freeze(*args, **kwargs)
         self.run()
         return self
+
+    def finished(self, error=None):
+        finished_text = """
+%(key)s:
+started at %(start)s
+finished in %(elapsed)s seconds
+%(errors)s"""%{
+            'key':self.key,
+            'start':self.start_time.strftime('%y/%m/%d %I:%M%p'),
+            'elapsed':(datetime.datetime.now()-self.start_time).seconds,
+            'errors': 'with errors: %s'%error if error else ''
+        }
+
+        REDIS.set('last_finished_%s'%self.group, finished_text)
+
+
 
 
 task = Task

@@ -1,0 +1,27 @@
+{% extends 'base/layout.html' %}
+
+{% block content %}
+<div class="col-md-6">
+<table class="table table-bordered">
+	<tr>
+		<th>queue</th>
+		<th>length</th>
+		<th>last result</th>
+	</tr>
+	{% for ql in queue_info	%}
+	<tr>
+		<td>{{ql.name}}
+		</td>
+		<td>
+			{{ql.length}}
+		</td>
+		<td>
+		<pre class="pre-scrollable">
+			{{ql.last}}
+		</pre>
+		</td>
+	</tr>
+	{% endfor %}
+</table>
+</div>
+{% endblock %}

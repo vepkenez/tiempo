@@ -249,8 +249,11 @@ def run_task(task, thread):
     with CaptureStdOut(task=task) as output:
         try:
             task.run()
+            task.finished()
         except:
             print traceback.format_exc()
+            task.finished(traceback.format_exc())
+
     output.finished()
 
     thread.active_task = False
