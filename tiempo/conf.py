@@ -1,4 +1,5 @@
 from logging import getLogger
+import os
 
 logger = getLogger(__name__)
 
@@ -7,7 +8,6 @@ try:
     has_django = True
 except (ImportError, Exception), e:
     logger.warning(str(e))
-    from os import environ as env
     has_django = False
 
 import json
@@ -26,15 +26,15 @@ if has_django:
     REDIS_PW = settings.REDIS_PW
 
 else:
-    INTERVAL = env.get('TIEMPO_INTERVAL', 5)
-    THREAD_COUNT = env.get('TIEMPO_THREADS', 1)
-    TASK_GROUPS = ['ALL'] + env.get('TIEMPO_GROUPS', [])
-    RESULT_LIFESPAN = env.get('TIEMPO_RESULT_LIFESPAN_DAYS', 1)
-    DEBUG = env.get('TIEMPO_DEBUG', False)
+    INTERVAL = os.environ.get('TIEMPO_INTERVAL', 5)
+    THREAD_COUNT = os.environ.get('TIEMPO_THREADS', 1)
+    TASK_GROUPS = ['ALL'] + os.environ.get('TIEMPO_GROUPS', [])
+    RESULT_LIFESPAN = os.environ.get('TIEMPO_RESULT_LIFESPAN_DAYS', 1)
+    DEBUG = os.environ.get('TIEMPO_DEBUG', False)
 
-    REDIS_HOST = env.get('TIEMPO_REDIS_HOST', 'localhost')
-    REDIS_PORT = env.get('TIEMPO_REDIS_PORT', 6379)
-    REDIS_QUEUE_DB = env.get('TIEMPO_REDIS_QUEUE_DB', 12)
-    REDIS_PW = env.get('TIEMPO_REDIS_PW', None)
+    REDIS_HOST = os.environ.get('TIEMPO_REDIS_HOST', 'localhost')
+    REDIS_PORT = os.environ.get('TIEMPO_REDIS_PORT', 6379)
+    REDIS_QUEUE_DB = os.environ.get('TIEMPO_REDIS_QUEUE_DB', 12)
+    REDIS_PW = os.environ.get('TIEMPO_REDIS_PW', None)
 
-TASK_PATHS = json.loads(env.get('TIEMPO_TASK_PATHS', '["tiempo.demo"]'))
+TASK_PATHS = json.loads(os.environ.get('TIEMPO_TASK_PATHS', '["tiempo.demo"]'))
