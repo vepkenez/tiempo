@@ -24,11 +24,11 @@ def dashboard(request):
         {
         'name': t, 
         'length': REDIS.llen(t),
-        'last': REDIS.get('last_finished_%s'%t),
+        'started': json.loads(REDIS.get('last_started_%s'%t)) if REDIS.get('last_started_%s'%t) else {},
+        'finished': json.loads(REDIS.get('last_finished_%s'%t)) if REDIS.get('last_finished_%s'%t) else {},
         }
         for t in tiemposettings.TASK_GROUPS
     ]
-
 
     response = render(request, 'tiempo/dashboard.html', {
         'queue_info': queue_length

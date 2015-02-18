@@ -20,6 +20,8 @@ import base64
 import importlib
 import functools
 import datetime
+import traceback
+import json
 
 
 logger = getLogger(__name__)
@@ -174,12 +176,19 @@ class Task(TaskBase):
         """
             runs this task right now
         """
-        self.start_time = datetime.datetime.now()
-        func = self._get_function()
-        func(
-            *getattr(self, 'args_to_function', ()),
-            **getattr(self, 'kwargs_to_function', {})
-        )
+        self.start()
+
+        try:
+            func = self._get_function()
+            func(
+                *getattr(self, 'args_to_function', ()),
+                **getattr(self, 'kwargs_to_function', {})
+            )
+            self.finish()
+        except Exception as e:
+            errtext = traceback.format_exc()
+            print errtext
+            self.finish(error=errtext)
 
     def soon(self, *args, **kwargs):
         """
@@ -201,21 +210,43 @@ class Task(TaskBase):
         self.run()
         return self
 
-    def finished(self, error=None):
-        finished_text = """
-%(key)s:
-started at %(start)s
-finished in %(elapsed)s seconds
-%(errors)s"""%{
-            'key':self.key,
-            'start':self.start_time.strftime('%y/%m/%d %I:%M%p'),
-            'elapsed':(datetime.datetime.now()-self.start_time).seconds,
+    def finish(self, error=None):
+
+        now = datetime.datetime.now()
+
+        data = {
+            'key': self.key,
+            'uuid':self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+            'finished': now.strftime('%y/%m/%d %I:%M%p'),
+            'elapsed':(now-self.start_time).seconds,
             'errors': 'with errors: %s'%error if error else ''
         }
 
-        REDIS.set('last_finished_%s'%self.group, finished_text)
+        data['text'] =  """
+%(key)s:
+started at %(start)s
+finished in %(elapsed)s seconds
+%(errors)s"""%data
+
+        REDIS.set('last_finished_%s'%self.group, json.dumps(data))
 
 
+    def start(self, error=None):
 
+        self.start_time = datetime.datetime.now()
+        now = datetime.datetime.now()
+
+        data = {
+            'key': self.key,
+            'uuid':self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+        }
+
+        data['text'] =  """
+%(key)s:
+starting at %(start)s"""%data
+
+        REDIS.set('last_started_%s'%self.group, json.dumps(data))
 
 task = Task

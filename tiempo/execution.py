@@ -36,21 +36,24 @@ class CaptureStdOut(list):
 
     def __enter__(self):
         if DEBUG:
-            return self
+            pass
+            # return self
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
         return self
 
     def __exit__(self, *args):
         if DEBUG:
-            return
+            # return
+            pass
 
         self.extend(self._stringio.getvalue().splitlines())
         sys.stdout = self._stdout
 
     def finished(self, timestamp=None):
         if DEBUG:
-            return
+            pass
+            # return
 
         self.timestamp = timestamp
         if not timestamp:
@@ -248,14 +251,14 @@ def run_task(task, thread):
     chalk.yellow('%r: %s' % (thread, task.key))
     with CaptureStdOut(task=task) as output:
         try:
+            task.start()
             task.run()
-            task.finished()
+            task.finish()
         except:
             print traceback.format_exc()
-            task.finished(traceback.format_exc())
+            task.finish(traceback.format_exc())
 
     output.finished()
-
     thread.active_task = False
 
 
