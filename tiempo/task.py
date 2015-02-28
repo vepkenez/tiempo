@@ -207,6 +207,7 @@ class Task(TaskBase):
             runs this task NOW with the args and kwargs
         """
         self._freeze(*args, **kwargs)
+        self._thaw()
         self.run()
         return self
 
