@@ -10,6 +10,7 @@ except ImportError:
     import pickle
 
 from . import TIEMPO_REGISTRY
+from . import REDIS_GROUP_NAMESPACE as group_ns
 from .conn import REDIS
 
 from logging import getLogger
@@ -26,6 +27,9 @@ import json
 
 logger = getLogger(__name__)
 
+
+def resolve_group_namespace(group_name):
+    return '%s:%s'%(group_ns, group_name)
 
 class TaskBase(object):
 
@@ -75,8 +79,6 @@ class Task(TaskBase):
 
     def __init__(self, *args, **kwargs):
 
-        self.groups = ['ALL']
-
         self.day = None
         self.hour = None
         self.minute = None
@@ -86,12 +88,15 @@ class Task(TaskBase):
 
         self.key = self.uid
         self.function_name = None
-        self.group = 'ALL'
+        self.group = kwargs.get('priority') or '1'
 
         self.frozen = False
         # group and other attrs may be overridden here.
         for key, val in kwargs.items():
             setattr(self, key, val)
+
+        if args and hasattr(args[0], '__call__'):
+            self.__setup(args)
 
     def __call__(self, *args, **kwargs):
 
@@ -99,21 +104,28 @@ class Task(TaskBase):
         # as a decorator, otherwise all "calls" are performed as
         # special functions ie. "now" or "soon" etc.
         if args and hasattr(args[0], '__call__'):
-            self.func = args[0]
-            self.cache = {}
-            functools.update_wrapper(self, self.func)
-            self.key = '%s.%s' % (
-                inspect.getmodule(self.func).__name__, self.func.__name__
-            )
-            TIEMPO_REGISTRY[self.key] = self
-            return self
+            self.__setup(args)
 
         return self
+
+    def __setup(self, args):
+        self.func = args[0]
+        self.cache = {}
+        functools.update_wrapper(self, self.func)
+        self.key = '%s.%s' % (
+            inspect.getmodule(self.func).__name__, self.func.__name__
+        )
+        TIEMPO_REGISTRY[self.key] = self
+        return self
+
+    @property
+    def group_key(self):
+        return resolve_group_namespace(self.group)
 
     def _freeze(self, *args, **kwargs):
 
         self.data = {
-            'function_module_path': inspect.getmodule(self.func).__name__,
+            'function_module_path': inspect.getmodule(self._get_function()).__name__,
             'function_name': self.func.__name__,
             'args_to_function': args,
             'kwargs_to_function': kwargs,
@@ -139,12 +151,16 @@ class Task(TaskBase):
         if not self.function_name:
             self._thaw()
 
-        module = importlib.import_module(self.function_module_path)
-        obj = getattr(module, self.function_name)
+        if hasattr(self, 'function_module_path'):
 
-        if hasattr(obj, 'func'):
-            return obj.func
-        return obj
+            module = importlib.import_module(self.function_module_path)
+            obj = getattr(module, self.function_name)
+
+            if hasattr(obj, 'func'):
+                return obj.func
+            return obj
+        else:
+            print "could not find function", self.func
 
     def _enqueue(self):
         if not self.frozen:
@@ -153,7 +169,7 @@ class Task(TaskBase):
             )
 
         d = self._encode(self.data)
-        REDIS.rpush(self.group, d)
+        REDIS.rpush(self.group_key, d)
         return self.data['uid']
 
     def get_schedule(self):
@@ -230,7 +246,7 @@ started at %(start)s
 finished in %(elapsed)s seconds
 %(errors)s"""%data
 
-        REDIS.set('last_finished_%s'%self.group, json.dumps(data))
+        REDIS.set('tiempo_last_finished_%s'%self.group_key, json.dumps(data))
 
 
     def start(self, error=None):
@@ -248,6 +264,6 @@ finished in %(elapsed)s seconds
 %(key)s:
 starting at %(start)s"""%data
 
-        REDIS.set('last_started_%s'%self.group, json.dumps(data))
+        REDIS.set('tiempo_last_started_%s'%self.group_key, json.dumps(data))
 
 task = Task

@@ -3,7 +3,7 @@ import time
 from tiempo.task import task
 
 
-@task(periodic=True)
+@task(periodic=True, minute=55)
 def test_task_logging():
     print 'test task logging is running'
 
@@ -23,7 +23,18 @@ def test_task_logging():
     print 'slept for 60'
 
 
-@task()
-def test_task_spawning(*args, **kwargs):
+
+@task(priority=1)
+def test_task_spawning_priority1(*args, **kwargs):
+    time.sleep(5)
+    print 'this task ran just fine with args, kwargs: %r, %r' % (args, kwargs)
+
+@task(priority=2)
+def test_task_spawning_priority2(*args, **kwargs):
+    time.sleep(5)
+    print 'this task ran just fine with args, kwargs: %r, %r' % (args, kwargs)
+
+@task(priority=3)
+def test_task_spawning_priority3(*args, **kwargs):
     time.sleep(5)
     print 'this task ran just fine with args, kwargs: %r, %r' % (args, kwargs)

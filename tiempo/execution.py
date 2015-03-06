@@ -1,8 +1,8 @@
 
 from . import TIEMPO_REGISTRY, RECENT_KEY
-from .task import Task
+from .task import Task, resolve_group_namespace
 from .conn import REDIS
-from .conf import INTERVAL, THREAD_COUNT, TASK_GROUPS, RESULT_LIFESPAN, DEBUG
+from .conf import INTERVAL, THREAD_CONFIG, RESULT_LIFESPAN, DEBUG
 from .exceptions import ResponseError
 
 from twisted.internet import threads, task
@@ -140,15 +140,19 @@ def get_task_keys(TASK_GROUPS):
 
 class ThreadManager(object):
 
-    def __init__(self, number):
+    def __init__(self, number, thread_group_list):
         self.active_task = None
+        self.task_groups = thread_group_list
         self.number = number
 
     def __repr__(self):
         return 'tiempo thread %d' % self.number
 
     def control(self):
-        chalk.blue('%r checking for work' % self)
+        if self.active_task:
+            msg = '%r currently busy with a task from %r'%(self, self.active_task)
+            chalk.red(msg)
+            logger.debug(msg)
 
         """
             First we check our task registry and check if there are any
@@ -163,14 +167,14 @@ class ThreadManager(object):
         now = utc_now()
         tomorrow = now + datetime.timedelta(days=1)
 
-        time_tasks = get_task_keys(TASK_GROUPS)
+        time_tasks = get_task_keys(self.task_groups)
 
         _tasks = [
             t for t in TIEMPO_REGISTRY.values()
-            if t.group in TASK_GROUPS and t.periodic
+            if t.group in self.task_groups and t.periodic
         ]
         for _task in _tasks:
-            stop_key = '%s:schedule:%s:stop' % (_task.group, _task.key)
+            stop_key = '%s:schedule:%s:stop' % (resolve_group_namespace(_task.group), _task.key)
 
             expire_key = time_tasks.get(_task.get_schedule())
             # the expire key is a datetime which signifies the NEXT time this
@@ -223,14 +227,17 @@ class ThreadManager(object):
                     print e
 
         try:
-            for g in TASK_GROUPS:
+            for g in self.task_groups:
                 if not self.active_task:
-                    task = REDIS.lpop(g)
+                    msg = '%r checking for work in group %r' % (self, g)
+                    chalk.blue(msg)
+                    logger.debug(msg)
+                    task = REDIS.lpop(resolve_group_namespace(g))
                     if task:
                         logger.debug(
                             'RUNNING TASK on thread %r: %s' % (self, task)
                         )
-                        self.active_task = True
+                        self.active_task = resolve_group_namespace(g)
                         threads.deferToThread(run_task, task, self)
 
         except BaseException as e:
@@ -246,29 +253,32 @@ class ThreadManager(object):
 
 
 def run_task(task, thread):
+    try:
+        task = Task.rehydrate(task)
+        chalk.yellow('%r STARTING: %s' % (thread, task.key))
+        with CaptureStdOut(task=task) as output:
+            try:
+                task.start()
+                task.run()
+                task.finish()
+            except:
+                print traceback.format_exc()
+                task.finish(traceback.format_exc())
 
-    task = Task.rehydrate(task)
-    chalk.yellow('%r: %s' % (thread, task.key))
-    with CaptureStdOut(task=task) as output:
-        try:
-            task.start()
-            task.run()
-            task.finish()
-        except:
-            print traceback.format_exc()
-            task.finish(traceback.format_exc())
-
-    output.finished()
-    thread.active_task = False
+        output.finished()
+        thread.active_task = None
+    except AttributeError as e:
+        thread.active_task = None
+        print traceback.format_exc() 
 
 
 def thread_init():
-    if THREAD_COUNT:
+    if len(THREAD_CONFIG):
         chalk.green('current time: %r' % utc_now())
         chalk.green(
-            'Found %d thread(s) specified by TIEMPO_THREADS' % THREAD_COUNT
+            'Found %d thread(s) specified by THREAD_CONFIG' % len(THREAD_CONFIG)
         )
 
-        for i in range(0, THREAD_COUNT):
-            tm = ThreadManager(i)
+        for index, thread_group_list in enumerate(THREAD_CONFIG):
+            tm = ThreadManager(index, thread_group_list)
             tm.start()
