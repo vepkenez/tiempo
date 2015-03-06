@@ -88,7 +88,7 @@ class Task(TaskBase):
 
         self.key = self.uid
         self.function_name = None
-        self.group = kwargs.get('priority') or '1'
+        self.group = unicode(kwargs.get('priority', kwargs.get('group','1')))
 
         self.frozen = False
         # group and other attrs may be overridden here.
