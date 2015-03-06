@@ -8,6 +8,7 @@
 			<th>length</th>
 			<th>last started</th>
 			<th>last finished</th>
+			<th>next</th>
 		</tr>
 		{% for ql in queue_info	%}
 		<tr>
@@ -42,6 +43,14 @@
 					</li>
 				</ul>
 				{% endif %}	
+			</td>
+			<td>
+				{% if ql.next %}
+					{{ql.next.function_name}}
+				{% else %}
+				----------
+				{% endif %}
+
 			</td>
 		</tr>
 				{% endfor %}
