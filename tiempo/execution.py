@@ -258,9 +258,7 @@ def run_task(task, thread):
         chalk.yellow('%r STARTING: %s' % (thread, task.key))
         with CaptureStdOut(task=task) as output:
             try:
-                task.start()
                 task.run()
-                task.finish()
             except:
                 print traceback.format_exc()
                 task.finish(traceback.format_exc())

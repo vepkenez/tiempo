@@ -122,7 +122,15 @@ class Task(TaskBase):
     def group_key(self):
         return resolve_group_namespace(self.group)
 
+    @property
+    def waitfor_key(self):
+        return resolve_group_namespace(self.uid)
+
     def _freeze(self, *args, **kwargs):
+    
+        # make a fresh uid specific to this instance that will persist
+        # through getting saved to the queue        
+        self.uid = str(uuid.uuid1())
 
         self.data = {
             'function_module_path': inspect.getmodule(self._get_function()).__name__,
@@ -130,7 +138,7 @@ class Task(TaskBase):
             'args_to_function': args,
             'kwargs_to_function': kwargs,
             'schedule': self.get_schedule(),
-            'uid': str(uuid.uuid1()),
+            'uid': self.uid,
         }
         self.frozen = True
 
@@ -162,15 +170,32 @@ class Task(TaskBase):
         else:
             print "could not find function", self.func
 
-    def _enqueue(self):
+    def _enqueue(self, queue_name):
         if not self.frozen:
             raise ValueError(
                 'need to freeze this task before enqueuing'
             )
 
+        print "enqueueing", self
         d = self._encode(self.data)
-        REDIS.rpush(self.group_key, d)
+
+        REDIS.rpush(queue_name, d)
         return self.data['uid']
+
+    def _enqueue_dependents(self):
+
+        obj = REDIS.lpop(self.waitfor_key)
+        if obj:
+            awaiting_task = Task.rehydrate(obj)
+            #queue it
+            print 'enqueing:', awaiting_task,'uid',awaiting_task.uid, 'with waitfor:', self.waitfor_key
+
+            awaiting_task.soon(
+                *getattr(awaiting_task, 'args_to_function', ()),
+                **getattr(awaiting_task, 'kwargs_to_function', {})
+            )
+
+            self._enqueue_dependents()
 
     def get_schedule(self):
         if self.periodic:
@@ -201,9 +226,9 @@ class Task(TaskBase):
                 **getattr(self, 'kwargs_to_function', {})
             )
             self.finish()
+
         except Exception as e:
             errtext = traceback.format_exc()
-            print errtext
             self.finish(error=errtext)
 
     def soon(self, *args, **kwargs):
@@ -214,8 +239,16 @@ class Task(TaskBase):
 
         """
         logger.debug('scheduling task %r for next available execution', self)
+
+        queue_name = kwargs.pop('tiempo_wait_for', None)
+
+        if queue_name:
+            queue_name = resolve_group_namespace(queue_name)
+        else:
+            queue_name = self.group_key
+
         self._freeze(*args, **kwargs)
-        self._enqueue()
+        self._enqueue(queue_name)
         return self
 
     def now(self, *args, **kwargs):
@@ -228,12 +261,13 @@ class Task(TaskBase):
         return self
 
     def finish(self, error=None):
+        print 'finished:', self.uid
+        self._enqueue_dependents()
 
         now = datetime.datetime.now()
-
         data = {
             'key': self.key,
-            'uuid':self.uid,
+            'uid':self.uid,
             'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
             'finished': now.strftime('%y/%m/%d %I:%M%p'),
             'elapsed':(now-self.start_time).seconds,
@@ -248,7 +282,6 @@ finished in %(elapsed)s seconds
 
         REDIS.set('tiempo_last_finished_%s'%self.group_key, json.dumps(data))
 
-
     def start(self, error=None):
 
         self.start_time = datetime.datetime.now()
@@ -256,7 +289,7 @@ finished in %(elapsed)s seconds
 
         data = {
             'key': self.key,
-            'uuid':self.uid,
+            'uid':self.uid,
             'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
         }
 
