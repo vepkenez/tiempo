@@ -221,11 +221,13 @@ class Task(TaskBase):
 
         try:
             func = self._get_function()
-            func(
+            result = func(
                 *getattr(self, 'args_to_function', ()),
                 **getattr(self, 'kwargs_to_function', {})
             )
             self.finish()
+
+            return result
 
         except Exception as e:
             errtext = traceback.format_exc()
@@ -257,8 +259,7 @@ class Task(TaskBase):
         """
         self._freeze(*args, **kwargs)
         self._thaw()
-        self.run()
-        return self
+        return self.run()
 
     def finish(self, error=None):
         print 'finished:', self.uid
