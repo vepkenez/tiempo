@@ -107,32 +107,25 @@ def get_task_keys(TASK_GROUPS):
     for tg in TASK_GROUPS:
 
         # every day, every hour, every minute
-        expires = now + datetime.timedelta(minutes=1)
-        time_keys['*.*.*'] = expires
+        time_keys['*.*.*'] = now + datetime.timedelta(minutes=1)
 
         # every day, every hour, this minute
-        expires = now + datetime.timedelta(hours=1)
-        time_keys[now.strftime('*.*.%M')] = expires
+        time_keys[now.strftime('*.*.%M')] = now + datetime.timedelta(hours=1)
 
         # every day, this hour, this minute
-        expires = now + datetime.timedelta(days=1)
-        time_keys[now.strftime('*.%H.%M')] = expires
+        time_keys[now.strftime('*.%H.%M')] = now + datetime.timedelta(days=1)
 
         # this day, this hour, this minute
-        expires = now + relativedelta(months=1)
-        time_keys[now.strftime('%d.%H.%M')] = expires
+        time_keys[now.strftime('%d.%H.%M')] = now + relativedelta(months=1)
 
         # this day, this hour, every minute
-        expires = now + datetime.timedelta(minutes=1)
-        time_keys[now.strftime('%d.%H.*')] = expires
+        time_keys[now.strftime('%d.%H.*')] = now + datetime.timedelta(minutes=1)
 
         # this day, every hour, every minute
-        expires = now + datetime.timedelta(minutes=1)
-        time_keys[now.strftime('%d.*.*')] = expires
+        time_keys[now.strftime('%d.*.*')] = now + datetime.timedelta(minutes=1)
 
         # every day, this hour, every minute
-        expires = now + datetime.timedelta(minutes=1)
-        time_keys[now.strftime('*.%H.*')] = expires
+        time_keys[now.strftime('*.%H.*')] = now + datetime.timedelta(minutes=1)
 
     # logger.debug(time_keys.keys())
     return time_keys
