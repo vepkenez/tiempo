@@ -15,8 +15,7 @@ import json
 
 if has_django:
     INTERVAL = getattr(settings, 'TIEMPO_INTERVAL', 5)
-    THREAD_COUNT = getattr(settings, 'TIEMPO_THREADS', 1)
-    TASK_GROUPS = ['ALL'] + getattr(settings, 'TIEMPO_GROUPS', [])
+    THREAD_CONFIG = getattr(settings, 'TIEMPO_THREAD_CONFIG', [('1','2','3'),('1','2'),('1',)])
     RESULT_LIFESPAN = getattr(settings, 'TIEMPO_RESULT_LIFESPAN_DAYS', 1)
     DEBUG = settings.DEBUG
 
@@ -27,8 +26,7 @@ if has_django:
 
 else:
     INTERVAL = os.environ.get('TIEMPO_INTERVAL', 5)
-    THREAD_COUNT = os.environ.get('TIEMPO_THREADS', 1)
-    TASK_GROUPS = ['ALL'] + os.environ.get('TIEMPO_GROUPS', [])
+    THREAD_CONFIG = os.environ.get('THREAD_CONFIG', [('1','2','3'),('1','2'),('1',)])
     RESULT_LIFESPAN = os.environ.get('TIEMPO_RESULT_LIFESPAN_DAYS', 1)
     DEBUG = os.environ.get('TIEMPO_DEBUG', False)
 

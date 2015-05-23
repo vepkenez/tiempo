@@ -1,6 +1,9 @@
 
 from datetime import datetime
 from tiempo.execution import REDIS, RECENT_KEY
+from tiempo.task import resolve_group_namespace as rgn
+from tiempo.task import task
+from tiempo import conf as tiemposettings
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
@@ -12,6 +15,29 @@ import dateutil.parser
 
 utc = pytz.timezone('UTC')
 local = pytz.timezone("America/New_York")
+
+
+
+@login_required
+def dashboard(request):
+
+    threads = tiemposettings.THREAD_CONFIG
+
+    queue_length = [
+        {
+        'name': t, 
+        'length': REDIS.llen(rgn(t)),
+        'started': json.loads(REDIS.get('tiempo_last_started_%s'%rgn(t))) if REDIS.get('tiempo_last_started_%s'%rgn(t)) else {},
+        'finished': json.loads(REDIS.get('tiempo_last_finished_%s'%rgn(t))) if REDIS.get('tiempo_last_finished_%s'%rgn(t)) else {},
+        'next': task._decode(REDIS.lindex(rgn(t), 0)) if REDIS.lindex(rgn(t), 0) else ''
+        }
+        for t in sorted(list(set([p for g in threads for p in g])))
+    ]
+
+    response = render(request, 'tiempo/dashboard.html', {
+        'queue_info': queue_length
+    })
+    return response
 
 
 @login_required

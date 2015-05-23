@@ -15,7 +15,6 @@ local = pytz.timezone("America/New_York")
 class MainDashboard(Resource):
 
     def render_GET(self, request):
-
         now = utc_now()
         past = now - timedelta(days=2)
         start = past.strftime('%s')

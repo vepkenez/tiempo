@@ -10,6 +10,7 @@ except ImportError:
     import pickle
 
 from . import TIEMPO_REGISTRY
+from . import REDIS_GROUP_NAMESPACE as group_ns
 from .conn import REDIS
 
 from logging import getLogger
@@ -19,10 +20,16 @@ import uuid
 import base64
 import importlib
 import functools
+import datetime
+import traceback
+import json
 
 
 logger = getLogger(__name__)
 
+
+def resolve_group_namespace(group_name):
+    return '%s:%s'%(group_ns, group_name)
 
 class TaskBase(object):
 
@@ -72,8 +79,6 @@ class Task(TaskBase):
 
     def __init__(self, *args, **kwargs):
 
-        self.groups = ['ALL']
-
         self.day = None
         self.hour = None
         self.minute = None
@@ -83,12 +88,15 @@ class Task(TaskBase):
 
         self.key = self.uid
         self.function_name = None
-        self.group = 'ALL'
+        self.group = unicode(kwargs.get('priority', kwargs.get('group','1')))
 
         self.frozen = False
         # group and other attrs may be overridden here.
         for key, val in kwargs.items():
             setattr(self, key, val)
+
+        if args and hasattr(args[0], '__call__'):
+            self.__setup(args)
 
     def __call__(self, *args, **kwargs):
 
@@ -96,26 +104,41 @@ class Task(TaskBase):
         # as a decorator, otherwise all "calls" are performed as
         # special functions ie. "now" or "soon" etc.
         if args and hasattr(args[0], '__call__'):
-            self.func = args[0]
-            self.cache = {}
-            functools.update_wrapper(self, self.func)
-            self.key = '%s.%s' % (
-                inspect.getmodule(self.func).__name__, self.func.__name__
-            )
-            TIEMPO_REGISTRY[self.key] = self
-            return self
+            self.__setup(args)
 
         return self
 
+    def __setup(self, args):
+        self.func = args[0]
+        self.cache = {}
+        functools.update_wrapper(self, self.func)
+        self.key = '%s.%s' % (
+            inspect.getmodule(self.func).__name__, self.func.__name__
+        )
+        TIEMPO_REGISTRY[self.key] = self
+        return self
+
+    @property
+    def group_key(self):
+        return resolve_group_namespace(self.group)
+
+    @property
+    def waitfor_key(self):
+        return resolve_group_namespace(self.uid)
+
     def _freeze(self, *args, **kwargs):
+    
+        # make a fresh uid specific to this instance that will persist
+        # through getting saved to the queue        
+        self.uid = str(uuid.uuid1())
 
         self.data = {
-            'function_module_path': inspect.getmodule(self.func).__name__,
+            'function_module_path': inspect.getmodule(self._get_function()).__name__,
             'function_name': self.func.__name__,
             'args_to_function': args,
             'kwargs_to_function': kwargs,
             'schedule': self.get_schedule(),
-            'uid': str(uuid.uuid1()),
+            'uid': self.uid,
         }
         self.frozen = True
 
@@ -136,22 +159,43 @@ class Task(TaskBase):
         if not self.function_name:
             self._thaw()
 
-        module = importlib.import_module(self.function_module_path)
-        obj = getattr(module, self.function_name)
+        if hasattr(self, 'function_module_path'):
 
-        if hasattr(obj, 'func'):
-            return obj.func
-        return obj
+            module = importlib.import_module(self.function_module_path)
+            obj = getattr(module, self.function_name)
 
-    def _enqueue(self):
+            if hasattr(obj, 'func'):
+                return obj.func
+            return obj
+        else:
+            print "could not find function", self.func
+
+    def _enqueue(self, queue_name):
         if not self.frozen:
             raise ValueError(
                 'need to freeze this task before enqueuing'
             )
 
+        print "enqueueing", self
         d = self._encode(self.data)
-        REDIS.rpush(self.group, d)
+
+        REDIS.rpush(queue_name, d)
         return self.data['uid']
+
+    def _enqueue_dependents(self):
+
+        obj = REDIS.lpop(self.waitfor_key)
+        if obj:
+            awaiting_task = Task.rehydrate(obj)
+            #queue it
+            print 'enqueing:', awaiting_task,'uid',awaiting_task.uid, 'with waitfor:', self.waitfor_key
+
+            awaiting_task.soon(
+                *getattr(awaiting_task, 'args_to_function', ()),
+                **getattr(awaiting_task, 'kwargs_to_function', {})
+            )
+
+            self._enqueue_dependents()
 
     def get_schedule(self):
         if self.periodic:
@@ -173,11 +217,21 @@ class Task(TaskBase):
         """
             runs this task right now
         """
-        func = self._get_function()
-        func(
-            *getattr(self, 'args_to_function', ()),
-            **getattr(self, 'kwargs_to_function', {})
-        )
+        self.start()
+
+        try:
+            func = self._get_function()
+            result = func(
+                *getattr(self, 'args_to_function', ()),
+                **getattr(self, 'kwargs_to_function', {})
+            )
+            self.finish()
+
+            return result
+
+        except Exception as e:
+            errtext = traceback.format_exc()
+            self.finish(error=errtext)
 
     def soon(self, *args, **kwargs):
         """
@@ -187,8 +241,16 @@ class Task(TaskBase):
 
         """
         logger.debug('scheduling task %r for next available execution', self)
+
+        queue_name = kwargs.pop('tiempo_wait_for', None)
+
+        if queue_name:
+            queue_name = resolve_group_namespace(queue_name)
+        else:
+            queue_name = self.group_key
+
         self._freeze(*args, **kwargs)
-        self._enqueue()
+        self._enqueue(queue_name)
         return self
 
     def now(self, *args, **kwargs):
@@ -196,8 +258,46 @@ class Task(TaskBase):
             runs this task NOW with the args and kwargs
         """
         self._freeze(*args, **kwargs)
-        self.run()
-        return self
+        self._thaw()
+        return self.run()
 
+    def finish(self, error=None):
+        print 'finished:', self.uid
+        self._enqueue_dependents()
+
+        now = datetime.datetime.now()
+        data = {
+            'key': self.key,
+            'uid':self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+            'finished': now.strftime('%y/%m/%d %I:%M%p'),
+            'elapsed':(now-self.start_time).seconds,
+            'errors': 'with errors: %s'%error if error else ''
+        }
+
+        data['text'] =  """
+%(key)s:
+started at %(start)s
+finished in %(elapsed)s seconds
+%(errors)s"""%data
+
+        REDIS.set('tiempo_last_finished_%s'%self.group_key, json.dumps(data))
+
+    def start(self, error=None):
+
+        self.start_time = datetime.datetime.now()
+        now = datetime.datetime.now()
+
+        data = {
+            'key': self.key,
+            'uid':self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+        }
+
+        data['text'] =  """
+%(key)s:
+starting at %(start)s"""%data
+
+        REDIS.set('tiempo_last_started_%s'%self.group_key, json.dumps(data))
 
 task = Task

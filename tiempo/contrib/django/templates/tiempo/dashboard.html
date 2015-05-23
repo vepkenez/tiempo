@@ -1,0 +1,59 @@
+{% extends 'base/layout.html' %}
+
+{% block content %}
+<div class="col-md-6">
+	<table class="table table-bordered">
+		<tr>
+			<th>queue</th>
+			<th>length</th>
+			<th>last started</th>
+			<th>last finished</th>
+			<th>next</th>
+		</tr>
+		{% for ql in queue_info	%}
+		<tr>
+			<td>
+				<a href="./queue/{{ql.name}}">{{ql.name}}</a> 
+			</td>
+			<td>
+				<strong>{{ql.length}}</strong>
+			</td>
+			<td>
+				{% if ql.started %}
+				<h4>
+					{{ql.started.key}}
+					<small class="pull-right">{{ql.started.uuid}}</small>
+				</h4>
+				<br>
+				<ul>
+					<li><label>started:</label>{{ql.started.start}}</li>
+				</ul>
+				{% endif %}
+			</td>
+			<td>
+				{% if ql.finished %}
+				<h4>{{ql.finished.key}}
+					<small class="pull-right">{{ql.finished.uuid}}</small>
+				</h4>
+				<br>
+				<ul>
+					<li><label>finished:</label>{{ql.finished.finished}} </li>
+					<li>
+						<label>elapsed:</label>{{ql.finished.elapsed}} seconds
+					</li>
+				</ul>
+				{% endif %}	
+			</td>
+			<td>
+				{% if ql.next %}
+					{{ql.next.function_name}}
+				{% else %}
+				----------
+				{% endif %}
+
+			</td>
+		</tr>
+				{% endfor %}
+	</table>
+</div>
+		{% endblock %}
