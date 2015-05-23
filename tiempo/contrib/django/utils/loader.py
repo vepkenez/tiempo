@@ -6,7 +6,7 @@ import importlib
 
 
 def auto_load_tasks():
-    for app in settings.PROJECT_APPS:
+    for app in settings.INSTALLED_APPS:
         module = importlib.import_module(app)
         try:
             importlib.import_module(app + '.tasks')
