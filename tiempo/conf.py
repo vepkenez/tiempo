@@ -20,7 +20,7 @@ if has_django:
     DEBUG = settings.DEBUG
 
     REDIS_HOST = getattr(settings,'REDIS_HOST', None) or 'localhost'
-    REDIS_PORT = getattr(settings, 'REDIS_PORT', None) or '6369'
+    REDIS_PORT = getattr(settings, 'REDIS_PORT', None) or '6379'
     REDIS_QUEUE_DB = getattr(settings, 'REDIS_QUEUE_DB', None) or 7
     REDIS_PW = getattr(settings, 'REDIS_PW', None)
 else:
