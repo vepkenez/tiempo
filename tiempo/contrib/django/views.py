@@ -35,7 +35,8 @@ def dashboard(request):
     ]
 
     response = render(request, 'tiempo/dashboard.html', {
-        'queue_info': queue_length
+        'queue_info': queue_length,
+        'title': 'Tiempo Dashboard'
     })
     return response
 
@@ -59,6 +60,7 @@ def recent_tasks(request):
 
     response = render(request, 'tiempo/recent.html', {
         'tasks': out,
+        'title': 'Tiempo Recent'
     })
     return response
 
