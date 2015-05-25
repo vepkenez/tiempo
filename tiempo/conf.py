@@ -19,11 +19,10 @@ if has_django:
     RESULT_LIFESPAN = getattr(settings, 'TIEMPO_RESULT_LIFESPAN_DAYS', 1)
     DEBUG = settings.DEBUG
 
-    REDIS_HOST = settings.REDIS_HOST
-    REDIS_PORT = settings.REDIS_PORT
-    REDIS_QUEUE_DB = settings.REDIS_QUEUE_DB
-    REDIS_PW = settings.REDIS_PW
-
+    REDIS_HOST = getattr(settings,'REDIS_HOST', None) or 'localhost'
+    REDIS_PORT = getattr(settings, 'REDIS_PORT', None) or '6369'
+    REDIS_QUEUE_DB = getattr(settings, 'REDIS_QUEUE_DB', None) or 7
+    REDIS_PW = getattr(settings, 'REDIS_PW', None)
 else:
     INTERVAL = os.environ.get('TIEMPO_INTERVAL', 5)
     THREAD_CONFIG = os.environ.get('THREAD_CONFIG', [('1','2','3'),('1','2'),('1',)])
