@@ -40,7 +40,12 @@ class TaskBase(object):
     @classmethod
     def _encode(cls, dictionary):
         "Returns the given session dictionary pickled and encoded as a string."
-        pickled = pickle.dumps(dictionary, pickle.HIGHEST_PROTOCOL)
+        try:
+            pickled = pickle.dumps(dictionary, pickle.HIGHEST_PROTOCOL)
+        except pickle.PicklingError as E:
+            msg = "PICKLING ERROR.  You have some complex data in the arguments to %r that cannot be pickled"%self
+            print msg
+            raise E(msg)
         return base64.b64encode(pickled).decode('ascii')
 
     @staticmethod
