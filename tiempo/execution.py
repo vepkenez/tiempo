@@ -169,7 +169,12 @@ class ThreadManager(object):
         for _task in _tasks:
             stop_key = '%s:schedule:%s:stop' % (resolve_group_namespace(_task.group), _task.key)
 
-            expire_key = time_tasks.get(_task.get_schedule())
+            if hasattr(_task, 'force_interval'):
+                expire_key = now + datetime.timedelta(
+                    seconds=_task.force_interval
+                )
+            else:
+                expire_key = time_tasks.get(_task.get_schedule())
             # the expire key is a datetime which signifies the NEXT time this
             # task would run if it was to be run right now.
             #
@@ -206,7 +211,7 @@ class ThreadManager(object):
 
                         REDIS.expire(
                             stop_key,
-                            int(float((expire_key - now).total_seconds()))
+                            int(float((expire_key - now).total_seconds())) - 1
                         )
 
                         # queue it up
@@ -260,7 +265,7 @@ def run_task(task, thread):
         thread.active_task = None
     except AttributeError as e:
         thread.active_task = None
-        print traceback.format_exc() 
+        print traceback.format_exc()
 
 
 def thread_init():
