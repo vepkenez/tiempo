@@ -1,0 +1,13 @@
+language: python
+env:
+- TOXENV=py27
+- TOXENV=pypy
+install:
+- pip install tox
+notifications:
+  email:
+    recipients:
+    - justin@justinholmes.com
+    on_success: change
+    on_failure: always
+script: tox
