@@ -236,7 +236,7 @@ class ThreadManager(object):
                             'RUNNING TASK on thread %r: %s' % (self, task)
                         )
                         self.active_task = resolve_group_namespace(g)
-                        threads.deferToThread(run_task, task, self)
+                        return threads.deferToThread(run_task, task, self)
 
         except BaseException as e:
             chalk.red('%s got an error' % self)
