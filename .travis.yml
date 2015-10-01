@@ -4,6 +4,8 @@ env:
 - TOXENV=pypy
 install:
 - pip install tox
+services:
+  - redis-server
 notifications:
   email:
     recipients:
