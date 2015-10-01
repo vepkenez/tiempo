@@ -132,6 +132,15 @@ class Task(TaskBase):
         return resolve_group_namespace(self.uid)
 
     def _freeze(self, *args, **kwargs):
+        
+        """
+            creates a 'data' object which will be serialized and pushed into redis
+            when this task is queued for execution.
+            
+            this data object should contain everything needed to reconstitute and 
+            execute the original function with args and kwargs in the context
+            of a worker process
+        """
     
         # make a fresh uid specific to this instance that will persist
         # through getting saved to the queue        
@@ -150,6 +159,16 @@ class Task(TaskBase):
         return self.data
 
     def _thaw(self, data=None):
+        """
+            If this is called it is after a task has been instantiated by
+            a worker process after being pulled as serialized data from redis
+            and decoded.
+            
+            the for loop where the attrs are set from the data dict 
+            will set this task to the same state as if it was 
+            __init__ed as a decorator 
+        """
+        
         if not data and hasattr(self, 'data'):
             data = self.data
 
