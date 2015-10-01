@@ -1,2 +1,5 @@
+import chalk
+
+
 def some_callable():
-    pass
+    chalk.red("This is some callable.")

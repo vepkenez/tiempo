@@ -1,4 +1,5 @@
 from unittest.case import TestCase
+from tiempo.conn import REDIS
 from tiempo.task import Task
 from sample_tasks import some_callable
 from tiempo import TIEMPO_REGISTRY
@@ -7,8 +8,11 @@ from tiempo import TIEMPO_REGISTRY
 class RegistryTests(TestCase):
 
     def test_task_decorator_adds_callable_to_registry(self):
+        REDIS.flushall()
         task = Task(priority=1, periodic=True, force_interval=1)
         decorated = task(some_callable)  # Pushes onto registry dict
+
+        # This fails now because the other test runs the reactor.
 
         self.assertEqual(len(TIEMPO_REGISTRY), 1)
 
