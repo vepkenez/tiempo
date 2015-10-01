@@ -72,12 +72,12 @@ class TaskBase(object):
             
         # we now have a dictionary like this:
         #    {
-        #    'function_module_path': a.path.to.a.function,
+        #    'function_module_path': "a.path.to.a.function",
         #    'function_name': "the function name",
         #    'args_to_function': (some, args),
-        #    'kwargs_to_function': {"keyword_arg": 5},
+        #    'kwargs_to_function': {"keyword_arg_count": 1},
         #    'schedule': "*.*.*",
-        #    'uid': '1234-12345678-12345678-1234',
+        #    'uid': "1234-12345678-12345678-1234",
         #    }
         
         module = importlib.import_module(d['function_module_path'])
