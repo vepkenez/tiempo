@@ -69,9 +69,28 @@ class TaskBase(object):
     def rehydrate(base_64):
 
         d = Task._decode(base_64)
-
+            
+        # we now have a dictionary like this:
+        #    {
+        #    'function_module_path': a.path.to.a.function,
+        #    'function_name': "the function name",
+        #    'args_to_function': (some, args),
+        #    'kwargs_to_function': {"keyword_arg": 5},
+        #    'schedule': "*.*.*",
+        #    'uid': '1234-12345678-12345678-1234',
+        #    }
+        
         module = importlib.import_module(d['function_module_path'])
         T = getattr(module, d['function_name'])
+        
+        if not isinstance(T, Task):
+            # if the function that this task decorates is imported from
+            # a different file path than where the decorating task is instantiated,
+            # it will not be wrapped normally
+            # so we wrap it.
+            
+            T = Task(T)
+        
         T.data = d
         T._thaw()
         return T
