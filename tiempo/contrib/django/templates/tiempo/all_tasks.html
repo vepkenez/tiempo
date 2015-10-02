@@ -1,0 +1,52 @@
+<style type="text/css">
+    td {
+        border: 1px solid black;
+    }
+</style>
+
+<table>
+    <tr>
+        <td>
+            Task Name
+        </td>
+        <td>
+            Interval
+        </td>
+        <td>
+            hours
+        </td>
+        <td>
+            minute
+        </td>
+        <td>
+            periodic
+        </td>
+        <td>
+            priority
+        </td>
+    </tr>
+    {% for task_name, task in tasks.items %}
+    <tr>
+        <td>
+            {{task_name}}
+        </td>
+        <td>
+            {{task.force_interval}}
+        </td>
+        <td>
+            {{task.hour}}
+        </td>
+        <td>
+            {{task.minute}}
+        </td>
+        <td>
+            {{task.periodic}}
+        </td>
+        <td>
+            {{task.priority}}
+        </td>
+
+
+    </tr>
+    {% endfor %}
+</table>

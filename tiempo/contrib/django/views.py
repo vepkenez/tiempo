@@ -1,9 +1,10 @@
 
 from datetime import datetime
 from tiempo.execution import REDIS, RECENT_KEY
-from tiempo.task import resolve_group_namespace as rgn
+from tiempo.task import resolve_group_namespace as rgn, Task
 from tiempo.task import task
 from tiempo import conf as tiemposettings
+from tiempo import TIEMPO_REGISTRY
 
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
@@ -18,7 +19,6 @@ local = pytz.timezone("America/New_York")
 
 
 
-@login_required
 def dashboard(request):
 
     threads = tiemposettings.THREAD_CONFIG
@@ -37,6 +37,15 @@ def dashboard(request):
     response = render(request, 'tiempo/dashboard.html', {
         'queue_info': queue_length,
         'title': 'Tiempo Dashboard'
+    })
+    return response
+
+
+def all_tasks(request):
+    tasks = TIEMPO_REGISTRY
+
+    response = render(request, 'tiempo/all_tasks.html', {
+        'tasks': tasks
     })
     return response
 
