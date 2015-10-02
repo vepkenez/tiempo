@@ -1,21 +1,22 @@
-
-from . import TIEMPO_REGISTRY, RECENT_KEY
-from .task import Task, resolve_group_namespace
-from .conn import REDIS
-from .conf import INTERVAL, THREAD_CONFIG, RESULT_LIFESPAN, DEBUG
-from .exceptions import ResponseError
-
-from twisted.internet import threads, task
-from dateutil.relativedelta import relativedelta
-from cStringIO import StringIO
-from logging import getLogger
-
 import datetime
 import sys
 import chalk
 import json
 import pytz
 import traceback
+import os
+
+from . import TIEMPO_REGISTRY, RECENT_KEY
+from .task import Task, resolve_group_namespace
+from .conn import REDIS
+from .conf import INTERVAL, THREAD_CONFIG, RESULT_LIFESPAN, DEBUG
+from .exceptions import ResponseError
+from .protocols import TiempoProcessProtocol
+
+from twisted.internet import threads, task, reactor
+from dateutil.relativedelta import relativedelta
+from cStringIO import StringIO
+from logging import getLogger
 
 
 logger = getLogger(__name__)
@@ -138,6 +139,8 @@ class ThreadManager(object):
         self.task_groups = thread_group_list
         self.number = number
 
+        # sys.stderr.write("TG:"+','.join(self.task_groups))
+
     def __repr__(self):
         return 'tiempo thread %d' % self.number
 
@@ -253,22 +256,21 @@ class ThreadManager(object):
 def run_task(task, thread):
     try:
         task = Task.rehydrate(task)
-        chalk.yellow('%r STARTING: %s' % (thread, task.key))
+        sys.stderr.write('%r STARTING: %s' % (thread, task.key))
         with CaptureStdOut(task=task) as output:
             try:
                 task.run()
             except:
-                print traceback.format_exc()
+                sys.stderr.write(traceback.format_exc())
                 task.finish(traceback.format_exc())
 
         output.finished()
         thread.active_task = None
     except AttributeError as e:
         thread.active_task = None
-        print traceback.format_exc()
+        sys.stderr.write(traceback.format_exc())
 
-
-def thread_init():
+def thread_init(executable_path=None, args=None):
     if len(THREAD_CONFIG):
         chalk.green('current time: %r' % utc_now())
         chalk.green(
@@ -276,5 +278,29 @@ def thread_init():
         )
 
         for index, thread_group_list in enumerate(THREAD_CONFIG):
-            tm = ThreadManager(index, thread_group_list)
-            tm.start()
+            spawn_process(index, thread_group_list, executable_path=executable_path, args=args)
+
+
+def spawn_process(index, thread_group_list, executable_path=None, args=None):
+
+    if not executable_path:
+        executable_path = os.path.join(
+            os.path.dirname(__file__),
+            "spawn.py"
+        )
+
+    processor = TiempoProcessProtocol()
+
+    thread_group_list = ["%s"%(','.join(thread_group_list))]
+    if args:
+        args = args + thread_group_list
+    else:
+        args = thread_group_list
+
+    reactor.spawnProcess(
+        processor,
+        sys.executable,
+        args=[sys.executable, executable_path] + args,
+        env=os.environ,
+        path=os.getcwd()
+    )

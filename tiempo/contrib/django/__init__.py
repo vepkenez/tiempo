@@ -1,0 +1,1 @@
+default_app_config = 'tiempo.contrib.django.appconfig.TiempoAppConfig'
