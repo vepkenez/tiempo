@@ -42,11 +42,7 @@ def dashboard(request):
 
 
 def all_tasks(request):
-    tasks = TIEMPO_REGISTRY
-
-    response = render(request, 'tiempo/all_tasks.html', {
-        'tasks': tasks
-    })
+    response = render(request, 'tiempo/all_tasks.html')
     return response
 
 

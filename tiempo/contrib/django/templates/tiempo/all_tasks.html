@@ -1,106 +1,78 @@
-<style type="text/css">
-    td {
-        border: 1px solid black;
-    }
-</style>
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Reelio Tiempo Dashboard</title>
+        <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.css">
+    </head>
+    <body ng-app='app'>
+        <md-toolbar>
+            <div class='md-toolbar-tools'>
+                <h1>Reelio - Tiempo</h1>
+            </div>
+        </md-toolbar>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
-<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+        <div ng-controller='TiempoController' layout-padding>
+            <div layout='row'>
+                <md-list flex='100'>
+                    <md-list-item>
+                        <div flex='100' layout='row' layout-align='space-around center'>
+                            <div>Time</div>
+                            <div>Message</div>
+                        </div>
+                    </md-list-item>
+                    <md-list-item ng-repeat='event in events'>
+                        <div  flex='100'layout='row' layout-align='space-around center'>
+                            <div>[{event.time | date:'short'}]</div>
+                            <div>[{event.message}]</div>
+                        </div>
+                    </md-list-item>
+                </md-list>
+            </div>
+        </div>
 
-  <script type="text/javascript">
+        <!-- Javascript -->
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-aria.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
+        <script type="text/javascript">
 
-    SOCKET_ADDRESS='all_tasks';
+            angular.module('CustomInterpolation', [])
+            .config(function($interpolateProvider) {
+                $interpolateProvider.startSymbol('[{');
+                $interpolateProvider.endSymbol('}]');
+            });
 
-  $(function(){
+            angular.module('TiempoController', [])
+            .controller('TiempoController', function($scope){
 
-    var sock = new SockJS('/messages/main/');
+                var sock = new SockJS('192.168.1.145:8000/messages/main/');
 
-    sock.onopen = function() {
+                $scope.events = [];
 
-     this.send(JSON.stringify({'hx_subscribe':SOCKET_ADDRESS}));
+                sock.onopen = function(e) {
+                    sock.send(
+                        JSON.stringify({'hx_subscribe':'all_tasks'})
+                    );
+                };
 
-        sock.onmessage = function(e) {
+                sock.onmessage = function(e) {
+                    var message = JSON.parse(e.data);
+                    if('time' in message){
+                        $scope.events.push(message);
+                        $scope.$apply()
+                    }
+                };
 
-          var data = JSON.parse(e.data);
+            });
 
-          if ("queue" in data) {
+            angular.module('app', [
+                'ngMaterial',
+                'TiempoController',
+                'CustomInterpolation'
+            ]);
 
-            // Make sure this queue has a div.
-            if ($('#queue-' + data.queue).length == 0) {
-              $('#queues').append('<tr id="queue-' + data.queue + '"><td>Queue ' + data.queue + '</td><td id="queue-' + data.queue + '-state"></td></td><td id="queue-' + data.queue + '-time"></td></tr>');
-            }
-
-            $('#queue-' + data.queue + '-state').html(data.message);
-            $('#queue-' + data.queue + '-time').html(data.time);
-
-
-          }
-
-          if ("task_next_run" in data) {
-            $('.next-run', '#' + data.task_next_run).html(data.time);
-
-          }
-
-        }
-
-
-    };
-  })
-
-  </script>
-
-<table id="queues">
-</table>
-
-
-<table>
-    <tr>
-        <td>
-            Task Name
-        </td>
-        <td>
-            Interval
-        </td>
-        <td>
-            Next Run
-        </td>
-        <td>
-            hours
-        </td>
-        <td>
-            minute
-        </td>
-        <td>
-            periodic
-        </td>
-        <td>
-            priority
-        </td>
-    </tr>
-    {% for task_name, task in tasks.items %}
-    <tr id="{{task.uid}}">
-        <td>
-            {{task_name}}
-        </td>
-        <td>
-            {{task.force_interval}}
-        </td>
-        <td class="next-run">
-        </td>
-        <td>
-            {{task.hour}}
-        </td>
-        <td>
-            {{task.minute}}
-        </td>
-        <td>
-            {{task.periodic}}
-        </td>
-        <td>
-            {{task.priority}}
-        </td>
-
-
-    </tr>
-    {% endfor %}
-</table>
+        </script>
+    </body>
+</html>

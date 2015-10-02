@@ -17,6 +17,7 @@ import json
 import pytz
 import traceback
 
+from hendrix.contrib.async.messaging import hxdispatcher
 
 logger = getLogger(__name__)
 
@@ -142,6 +143,9 @@ class ThreadManager(object):
         return 'tiempo thread %d' % self.number
 
     def control(self):
+
+        dispatch = {'queue': self.number, 'time': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S")}
+
         if self.active_task:
             msg = '%r currently busy with a task from %r'%(self, self.active_task)
             chalk.red(msg)
@@ -209,12 +213,15 @@ class ThreadManager(object):
                         # at the time of the next appropriate running of this
                         # task
 
+                        next_stop_key = int(float((expire_key - now).total_seconds())) - 1
+
                         REDIS.expire(
                             stop_key,
-                            int(float((expire_key - now).total_seconds())) - 1
+                            next_stop_key
                         )
 
                         # queue it up
+                        hxdispatcher.send("all_tasks", {'task_next_run': _task.uid, 'time': next_stop_key})
                         _task.soon()
 
                         logger.debug('next will be: %r', expire_key)
@@ -228,15 +235,24 @@ class ThreadManager(object):
             for g in self.task_groups:
                 if not self.active_task:
                     msg = '%r checking for work in group %r' % (self, g)
-                    chalk.blue(msg)
                     logger.debug(msg)
-                    task = REDIS.lpop(resolve_group_namespace(g))
+                    name = resolve_group_namespace(g)
+                    print REDIS.keys()
+                    print "Found: %s" % REDIS.type(name)
+                    task = REDIS.lpop(name)
                     if task:
+                        print REDIS.keys()
                         logger.debug(
                             'RUNNING TASK on thread %r: %s' % (self, task)
                         )
                         self.active_task = resolve_group_namespace(g)
-                        return threads.deferToThread(run_task, task, self)
+
+            if self.active_task:
+                return threads.deferToThread(run_task, task, self)
+            else:
+                dispatch['message'] = "No active task."
+
+            hxdispatcher.send('all_tasks', dispatch)
 
         except BaseException as e:
             chalk.red('%s got an error' % self)
