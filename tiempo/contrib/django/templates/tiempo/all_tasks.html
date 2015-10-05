@@ -4,6 +4,55 @@
     }
 </style>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+
+  <script type="text/javascript">
+
+    SOCKET_ADDRESS='all_tasks';
+
+  $(function(){
+
+    var sock = new SockJS('/messages/main/');
+
+    sock.onopen = function() {
+
+     this.send(JSON.stringify({'hx_subscribe':SOCKET_ADDRESS}));
+
+        sock.onmessage = function(e) {
+
+          var data = JSON.parse(e.data);
+
+          if ("queue" in data) {
+
+            // Make sure this queue has a div.
+            if ($('#queue-' + data.queue).length == 0) {
+              $('#queues').append('<tr id="queue-' + data.queue + '"><td>Queue ' + data.queue + '</td><td id="queue-' + data.queue + '-state"></td></td><td id="queue-' + data.queue + '-time"></td></tr>');
+            }
+
+            $('#queue-' + data.queue + '-state').html(data.message);
+            $('#queue-' + data.queue + '-time').html(data.time);
+
+
+          }
+
+          if ("task_next_run" in data) {
+            $('.next-run', '#' + data.task_next_run).html(data.time);
+
+          }
+
+        }
+
+
+    };
+  })
+
+  </script>
+
+<table id="queues">
+</table>
+
+
 <table>
     <tr>
         <td>
@@ -11,6 +60,9 @@
         </td>
         <td>
             Interval
+        </td>
+        <td>
+            Next Run
         </td>
         <td>
             hours
@@ -26,12 +78,14 @@
         </td>
     </tr>
     {% for task_name, task in tasks.items %}
-    <tr>
+    <tr id="{{task.uid}}">
         <td>
             {{task_name}}
         </td>
         <td>
             {{task.force_interval}}
+        </td>
+        <td class="next-run">
         </td>
         <td>
             {{task.hour}}
