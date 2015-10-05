@@ -13,19 +13,24 @@
 
         <div ng-controller='TiempoController' layout-padding>
             <div layout='row'>
-                <md-list flex='100'>
+                <md-list flex='100' class='md-whiteframe-1dp'>
                     <md-list-item>
                         <div flex='100' layout='row' layout-align='space-around center'>
-                            <div>Time</div>
-                            <div>Message</div>
+                            <div flex='10'>Queue</div>
+                            <div flex='40'>Time</div>
+                            <div flex='40'>Message</div>
                         </div>
                     </md-list-item>
-                    <md-list-item ng-repeat='queue in queues'>
-                        <div  flex='100'layout='row' layout-align='space-around center'>
-                            <div>[{queue.time | date:'short'}]</div>
-                            <div>[{queue.message}]</div>
-                        </div>
-                    </md-list-item>
+                    <div ng-repeat='queue in queues'>
+                        <md-divider></md-divider>
+                        <md-list-item>
+                            <div flex='100'layout='row' layout-align='space-around center'>
+                                <div flex='10'>[{queue.queue}]</div>
+                                <div flex='40'>[{queue.time | date:'short'}]</div>
+                                <div flex='40'>[{queue.message}]</div>
+                            </div>
+                        </md-list-item>
+                    </div>
                 </md-list>
             </div>
         </div>
