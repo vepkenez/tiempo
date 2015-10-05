@@ -20,10 +20,10 @@
                             <div>Message</div>
                         </div>
                     </md-list-item>
-                    <md-list-item ng-repeat='event in events'>
+                    <md-list-item ng-repeat='queue in queues'>
                         <div  flex='100'layout='row' layout-align='space-around center'>
-                            <div>[{event.time | date:'short'}]</div>
-                            <div>[{event.message}]</div>
+                            <div>[{queue.time | date:'short'}]</div>
+                            <div>[{queue.message}]</div>
                         </div>
                     </md-list-item>
                 </md-list>
@@ -36,6 +36,7 @@
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-aria.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
         <script type="text/javascript">
 
             angular.module('CustomInterpolation', [])
@@ -49,18 +50,26 @@
 
                 var sock = new SockJS('192.168.1.145:8000/messages/main/');
 
-                $scope.events = [];
+                $scope.queues = [];
 
                 sock.onopen = function(e) {
                     sock.send(
-                        JSON.stringify({'hx_subscribe':'all_tasks'})
+                        JSON.stringify({'hx_subscribe': 'all_tasks'})
                     );
                 };
 
                 sock.onmessage = function(e) {
                     var message = JSON.parse(e.data);
-                    if('time' in message){
-                        $scope.events.push(message);
+                    if('queue' in message){
+                        var queueIndex = _.findIndex($scope.queues, function(obj){
+                            return obj.queue == message.queue;
+                        })
+                        if(queueIndex == -1){
+                            $scope.queues.push(message);
+                        }
+                        else{
+                            $scope.queues[queueIndex] = message;
+                        }
                         $scope.$apply()
                     }
                 };
