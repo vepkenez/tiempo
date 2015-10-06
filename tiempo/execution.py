@@ -6,7 +6,6 @@ from .conf import INTERVAL, THREAD_CONFIG, RESULT_LIFESPAN, DEBUG
 from .exceptions import ResponseError
 
 from twisted.internet import threads, task
-from dateutil.relativedelta import relativedelta
 from cStringIO import StringIO
 from logging import getLogger
 
@@ -14,16 +13,13 @@ import datetime
 import sys
 import chalk
 import json
-import pytz
+
 import traceback
 
 from hendrix.contrib.async.messaging import hxdispatcher
+from tiempo.utils import utc_now
 
 logger = getLogger(__name__)
-
-
-def utc_now():
-    return datetime.datetime.now(pytz.utc)
 
 
 class CaptureStdOut(list):
@@ -84,54 +80,6 @@ class CaptureStdOut(list):
         )
 
 
-def get_task_keys(TASK_GROUPS):
-    """
-        creates a dictionary containing a mapping every combination of
-        cron like keys with the corresponding amount of time
-        until the next execution of such a task if it were to be executed
-        now.
-
-
-        ie:
-
-        {'*.*.*': <1 minute from now>,}
-        {'*.5.*': <1 minute from now>,}
-        {'*.5.11': <24 hours from now>,}
-
-    """
-
-    time_keys = {}
-
-    now = utc_now()
-
-    # first any tasks that want to happen this minute.
-    for tg in TASK_GROUPS:
-
-        # every day, every hour, every minute
-        time_keys['*.*.*'] = now + datetime.timedelta(minutes=1)
-
-        # every day, every hour, this minute
-        time_keys[now.strftime('*.*.%M')] = now + datetime.timedelta(hours=1)
-
-        # every day, this hour, this minute
-        time_keys[now.strftime('*.%H.%M')] = now + datetime.timedelta(days=1)
-
-        # this day, this hour, this minute
-        time_keys[now.strftime('%d.%H.%M')] = now + relativedelta(months=1)
-
-        # this day, this hour, every minute
-        time_keys[now.strftime('%d.%H.*')] = now + datetime.timedelta(minutes=1)
-
-        # this day, every hour, every minute
-        time_keys[now.strftime('%d.*.*')] = now + datetime.timedelta(minutes=1)
-
-        # every day, this hour, every minute
-        time_keys[now.strftime('*.%H.*')] = now + datetime.timedelta(minutes=1)
-
-    # logger.debug(time_keys.keys())
-    return time_keys
-
-
 class ThreadManager(object):
 
     def __init__(self, number, thread_group_list):
@@ -164,21 +112,26 @@ class ThreadManager(object):
         now = utc_now()
         tomorrow = now + datetime.timedelta(days=1)
 
-        time_tasks = get_task_keys(self.task_groups)
-
         _tasks = [
             t for t in TIEMPO_REGISTRY.values()
             if t.group in self.task_groups and t.periodic
         ]
         for _task in _tasks:
-            stop_key = '%s:schedule:%s:stop' % (resolve_group_namespace(_task.group), _task.key)
+            stop_key = _task.stop_key
 
-            if hasattr(_task, 'force_interval'):
-                expire_key = now + datetime.timedelta(
-                    seconds=_task.force_interval
-                )
-            else:
-                expire_key = time_tasks.get(_task.get_schedule())
+            chalk.red("%s stop key: %s" % (_task, stop_key))
+
+            expire_key = _task.next_expiration_dt()
+#########################################################################
+            # if hasattr(_task, 'force_interval'):
+            #     expire_key = now + datetime.timedelta(
+            #         seconds=_task.force_interval
+            #     )
+            # else:
+            #     expire_key = time_tasks.get(_task.get_schedule())
+#########################################################################
+
+
             # the expire key is a datetime which signifies the NEXT time this
             # task would run if it was to be run right now.
             #
@@ -193,8 +146,8 @@ class ThreadManager(object):
                     # create a key whose existence prevents this task
                     # from executing.  This will ensure that it only runs
                     # once across the whole network.
-
-                    if REDIS.setnx(stop_key, 0):
+                    stop_key_has_expired = REDIS.setnx(stop_key, 0)  # set the key to 0 if it has expired.
+                    if stop_key_has_expired:
                         logger.debug(
                             'running task %r because: %r',
                             _task, _task.get_schedule()

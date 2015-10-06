@@ -1,4 +1,6 @@
 
+from tiempo.utils import utc_now, get_task_keys
+
 try:
     from django.utils.encoding import force_bytes
 except ImportError:
@@ -30,6 +32,7 @@ logger = getLogger(__name__)
 
 def resolve_group_namespace(group_name):
     return '%s:%s'%(group_ns, group_name)
+
 
 class TaskBase(object):
 
@@ -150,6 +153,10 @@ class Task(TaskBase):
     def waitfor_key(self):
         return resolve_group_namespace(self.uid)
 
+    @property
+    def stop_key(self):
+        return '%s:schedule:%s:stop' % (resolve_group_namespace(self.group), self.key)
+
     def _freeze(self, *args, **kwargs):
         
         """
@@ -255,6 +262,17 @@ class Task(TaskBase):
                     sched[i] = attr
 
             return '.'.join(sched)
+
+    def next_expiration_dt(self):
+        if hasattr(self, 'force_interval'):
+            expiration_dt = utc_now() + datetime.timedelta(
+                seconds=self.force_interval
+            )
+        else:
+            run_times = get_task_keys()
+            expiration_dt = run_times.get(self.get_schedule())
+
+        return expiration_dt
 
     def run(self):
         """
