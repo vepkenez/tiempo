@@ -16,21 +16,42 @@
                 <md-list flex='100' class='md-whiteframe-1dp'>
                     <md-list-item>
                         <div flex='100' layout='row' layout-align='space-around center'>
-                            <div flex='10'>Queue</div>
+                            <div flex='10'>Runner</div>
                             <div flex='40'>Time</div>
                             <div flex='40'>Message</div>
                         </div>
                     </md-list-item>
-                    <div ng-repeat='queue in queues'>
+
+
+                    <div ng-repeat='runner in runners'>
                         <md-divider></md-divider>
                         <md-list-item>
                             <div flex='100'layout='row' layout-align='space-around center'>
-                                <div flex='10'>[{queue.queue}]</div>
-                                <div flex='40'>[{queue.time | date:'short'}]</div>
-                                <div flex='40'>[{queue.message}]</div>
+                                <div flex='10'>[{runner.runner}]</div>
+                                <div flex='40'>[{runner.time | date:'short'}]</div>
+                                <div flex='40'>[{runner.message}]</div>
                             </div>
                         </md-list-item>
                     </div>
+
+
+                    <md-list-item>
+                        <div flex='100' layout='row' layout-align='space-around center'>
+                            <div flex='60'>Task path</div>
+                            <div flex='40'>Next Run Time</div>
+                        </div>
+                    </md-list-item>
+
+                    <div ng-repeat='task in tasks'>
+                        <md-divider></md-divider>
+                        <md-list-item>
+                            <div flex='100'layout='row' layout-align='space-around center'>
+                                <div flex='60'>[{task.name}]</div>
+                                <div flex='40'>[{task.next_run_time | daysTill}]</div>
+                            </div>
+                        </md-list-item>
+                    </div>
+
                 </md-list>
             </div>
         </div>
@@ -50,12 +71,48 @@
                 $interpolateProvider.endSymbol('}]');
             });
 
+
+            // datetime filter
+            angular.module('DaysTillFilter', [])
+            .filter('daysTill', function(){
+                var secsInDay = 24*60*60;
+                var pluralizer = function(time, unit){
+                    var total = time + ' '+ unit;
+                    total += (time === 1) ? '' : 's';
+                    return total;
+                };
+                return function (date, close, dayMode){
+                    close = close || ' closed';
+                    date = (date instanceof Date) ? date : Date.parse(date);
+                    var secs = ((date - new Date())/1000);
+                    if(secs <= 0) return '0' + close;
+                    if(dayMode) {
+                        var days = Math.round(secs/secsInDay);
+                        if(days > 0){
+                            return pluralizer(days, 'day');
+                        }
+                        else{
+                            return '< 1 day';
+                        }
+                    }
+                    else {
+                        return pluralizer(Math.round(secs), 'second');
+                        }
+                };
+            });
+
+
+
+
+
+
             angular.module('TiempoController', [])
             .controller('TiempoController', function($scope){
 
                 var sock = new SockJS('192.168.1.145:8000/messages/main/');
 
-                $scope.queues = [];
+                $scope.runners = [];
+                $scope.tasks = [];
 
                 sock.onopen = function(e) {
                     sock.send(
@@ -65,17 +122,29 @@
 
                 sock.onmessage = function(e) {
                     var message = JSON.parse(e.data);
-                    if('queue' in message){
-                        var queueIndex = _.findIndex($scope.queues, function(obj){
-                            return obj.queue == message.queue;
+                    if('runner' in message){
+                        var runnerIndex = _.findIndex($scope.runners, function(obj){
+                            return obj.runner == message.runner;
                         })
-                        if(queueIndex == -1){
-                            $scope.queues.push(message);
+                        if(runnerIndex == -1){
+                            $scope.runners.push(message);
                         }
                         else{
-                            $scope.queues[queueIndex] = message;
+                            $scope.runners[runnerIndex] = message;
                         }
                         $scope.$apply()
+                    }
+
+                    if('task' in message){
+                      var taskIndex = _.findIndex($scope.tasks, function(obj){
+                          return obj.task == message.task;
+                      });
+                      if(taskIndex == -1){
+                          $scope.tasks.push(message);
+                      }
+                      else {
+                          $scope.tasks[taskIndex] = message;
+                      }
                     }
                 };
 
@@ -84,7 +153,8 @@
             angular.module('app', [
                 'ngMaterial',
                 'TiempoController',
-                'CustomInterpolation'
+                'CustomInterpolation',
+                'DaysTillFilter'
             ]);
 
         </script>

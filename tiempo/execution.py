@@ -1,4 +1,3 @@
-
 from . import TIEMPO_REGISTRY, RECENT_KEY
 from .task import Task, resolve_group_namespace
 from .conn import REDIS
@@ -16,6 +15,7 @@ import json
 
 import traceback
 
+from dateutil.relativedelta import relativedelta
 from hendrix.contrib.async.messaging import hxdispatcher
 from tiempo.utils import utc_now
 
@@ -92,7 +92,7 @@ class ThreadManager(object):
 
     def control(self):
 
-        dispatch = {'queue': self.number, 'time': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S")}
+        dispatch = {'runner': self.number, 'time': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S")}
 
         if self.active_task:
             msg = '%r currently busy with a task from %r'%(self, self.active_task)
@@ -122,15 +122,10 @@ class ThreadManager(object):
             chalk.red("%s stop key: %s" % (_task, stop_key))
 
             expire_key = _task.next_expiration_dt()
-#########################################################################
-            # if hasattr(_task, 'force_interval'):
-            #     expire_key = now + datetime.timedelta(
-            #         seconds=_task.force_interval
-            #     )
-            # else:
-            #     expire_key = time_tasks.get(_task.get_schedule())
-#########################################################################
-
+            hxdispatcher.send('all_tasks',
+                              {'task': _task.uid,
+                               'name': _task.key,
+                               'next_run_time': expire_key.isoformat()})
 
             # the expire key is a datetime which signifies the NEXT time this
             # task would run if it was to be run right now.
@@ -174,7 +169,6 @@ class ThreadManager(object):
                         )
 
                         # queue it up
-                        hxdispatcher.send("all_tasks", {'task_next_run': _task.uid, 'time': next_stop_key})
                         _task.soon()
 
                         logger.debug('next will be: %r', expire_key)
