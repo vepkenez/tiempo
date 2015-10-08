@@ -24,7 +24,7 @@ if has_django:
     REDIS_QUEUE_DB = getattr(settings, 'REDIS_QUEUE_DB', None) or 7
     REDIS_PW = getattr(settings, 'REDIS_PW', None)
 else:
-    INTERVAL = os.environ.get('TIEMPO_INTERVAL', 5)
+    INTERVAL = os.environ.get('TIEMPO_INTERVAL', 1)
     THREAD_CONFIG = os.environ.get('THREAD_CONFIG', [('1','2','3'),('1','2'),('1',)])
     RESULT_LIFESPAN = os.environ.get('TIEMPO_RESULT_LIFESPAN_DAYS', 1)
     DEBUG = os.environ.get('TIEMPO_DEBUG', False)

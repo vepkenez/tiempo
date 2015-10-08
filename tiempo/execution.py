@@ -1,25 +1,19 @@
-from . import TIEMPO_REGISTRY, RECENT_KEY
-from .task import Task, resolve_group_namespace
+from . import RECENT_KEY
+from tiempo import tiempo_loop
+from tiempo.work import Job
+from tiempo.runner import Runner
 from .conn import REDIS
 from .conf import INTERVAL, THREAD_CONFIG, RESULT_LIFESPAN, DEBUG
-from .exceptions import ResponseError
-
-from twisted.internet import threads, task
 from cStringIO import StringIO
-from logging import getLogger
 
-import datetime
 import sys
 import chalk
 import json
 
-import traceback
-
 from dateutil.relativedelta import relativedelta
-from hendrix.contrib.async.messaging import hxdispatcher
 from tiempo.utils import utc_now
-
-logger = getLogger(__name__)
+from twisted.logger import Logger
+logger = Logger()
 
 
 class CaptureStdOut(list):
@@ -80,155 +74,7 @@ class CaptureStdOut(list):
         )
 
 
-class ThreadManager(object):
 
-    def __init__(self, number, thread_group_list):
-        self.active_task = None
-        self.task_groups = thread_group_list
-        self.number = number
-
-    def __repr__(self):
-        return 'tiempo thread %d' % self.number
-
-    def control(self):
-
-        dispatch = {'runner': self.number, 'time': datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S")}
-
-        if self.active_task:
-            msg = '%r currently busy with a task from %r'%(self, self.active_task)
-            chalk.red(msg)
-            logger.debug(msg)
-
-        """
-            First we check our task registry and check if there are any
-            tasks that should be running right this second.
-
-            If there are, we queue them.
-
-            Next we execute queued tasks
-
-        """
-
-        now = utc_now()
-        tomorrow = now + datetime.timedelta(days=1)
-
-        _tasks = [
-            t for t in TIEMPO_REGISTRY.values()
-            if t.group in self.task_groups and t.periodic
-        ]
-        for _task in _tasks:
-            stop_key = _task.stop_key
-
-            chalk.red("%s stop key: %s" % (_task, stop_key))
-
-            expire_key = _task.next_expiration_dt()
-            hxdispatcher.send('all_tasks',
-                              {'task': _task.uid,
-                               'name': _task.key,
-                               'next_run_time': expire_key.isoformat()})
-
-            # the expire key is a datetime which signifies the NEXT time this
-            # task would run if it was to be run right now.
-            #
-            # if there is no expire key it means that there are no tasks that
-            # should run right now.
-
-            if expire_key:
-                # if we are here, it means we have a task that could run
-                # right now if no other worker has already started it.
-                try:
-
-                    # create a key whose existence prevents this task
-                    # from executing.  This will ensure that it only runs
-                    # once across the whole network.
-                    stop_key_has_expired = REDIS.setnx(stop_key, 0)  # set the key to 0 if it has expired.
-                    if stop_key_has_expired:
-                        logger.debug(
-                            'running task %r because: %r',
-                            _task, _task.get_schedule()
-                        )
-                        logger.debug('expire key: %r', expire_key)
-                        logger.debug('now: %r', now)
-                        logger.debug('stop key: %r', stop_key)
-                        logger.debug(
-                            'seconds: %r', (expire_key - now).total_seconds()
-                        )
-                        # the creation of the key was successful.
-                        # this means that previous keys whose existence
-                        # postponed execution for this task have expired.
-
-                        # We will now set the expiration on this key to expire
-                        # at the time of the next appropriate running of this
-                        # task
-
-                        next_stop_key = int(float((expire_key - now).total_seconds())) - 1
-
-                        REDIS.expire(
-                            stop_key,
-                            next_stop_key
-                        )
-
-                        # queue it up
-                        _task.soon()
-
-                        logger.debug('next will be: %r', expire_key)
-
-                except ResponseError as e:
-                    print e
-                except BaseException as e:
-                    print e
-
-        try:
-            for g in self.task_groups:
-                if not self.active_task:
-                    msg = '%r checking for work in group %r' % (self, g)
-                    logger.debug(msg)
-                    name = resolve_group_namespace(g)
-                    print REDIS.keys()
-                    print "Found: %s" % REDIS.type(name)
-                    task = REDIS.lpop(name)
-                    if task:
-                        print REDIS.keys()
-                        logger.debug(
-                            'RUNNING TASK on thread %r: %s' % (self, task)
-                        )
-                        self.active_task = resolve_group_namespace(g)
-
-            if self.active_task:
-                return threads.deferToThread(run_task, task, self)
-            else:
-                dispatch['message'] = "No active task."
-
-            hxdispatcher.send('all_tasks', dispatch)
-
-        except BaseException as e:
-            chalk.red('%s got an error' % self)
-            print traceback.format_exc()
-
-    def cleanup(self):
-        pass
-        # print 'thread %d cleaning up' % thread
-
-    def start(self):
-        task.LoopingCall(self.control).start(INTERVAL)
-
-
-def run_task(task, thread):
-    try:
-        task = Task.rehydrate(task)
-        chalk.yellow('%r STARTING: %s' % (thread, task.key))
-        with CaptureStdOut(task=task) as output:
-            try:
-                task.run()
-            except:
-                print traceback.format_exc()
-                task.finish(traceback.format_exc())
-
-        output.finished()
-        thread.active_task = None
-    except AttributeError as e:
-        thread.active_task = None
-        print traceback.format_exc()
 
 
 def thread_init():
@@ -239,5 +85,6 @@ def thread_init():
         )
 
         for index, thread_group_list in enumerate(THREAD_CONFIG):
-            tm = ThreadManager(index, thread_group_list)
-            tm.start()
+            runner = Runner(index, thread_group_list)
+
+    tiempo_loop.start()

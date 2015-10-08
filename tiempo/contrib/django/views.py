@@ -1,8 +1,7 @@
 
 from datetime import datetime
 from tiempo.execution import REDIS, RECENT_KEY
-from tiempo.task import resolve_group_namespace as rgn, Task
-from tiempo.task import task
+
 from tiempo import conf as tiemposettings
 from tiempo import TIEMPO_REGISTRY
 

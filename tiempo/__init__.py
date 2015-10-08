@@ -1,6 +1,7 @@
 PROJECT_PATH = __path__[0]
 
 TIEMPO_REGISTRY = {}
+RUNNERS = []
 
 REDIS_GROUP_NAMESPACE = 'tiempogroup'
 RECENT_KEY = 'tiempo:recent_tasks'

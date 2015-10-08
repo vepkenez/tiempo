@@ -8,6 +8,7 @@ import os
 import datetime
 import pytz
 from dateutil.relativedelta import relativedelta
+from tiempo import REDIS_GROUP_NAMESPACE
 
 def utc_now():
     return datetime.datetime.now(pytz.utc)
@@ -79,7 +80,7 @@ def force_bytes(s, encoding='utf-8', strings_only=False, errors='strict'):
         return s.encode(encoding, errors)
 
 
-def get_task_keys():
+def task_time_keys():
     """
         creates a dictionary containing a mapping every combination of
         cron like keys with the corresponding amount of time
@@ -123,3 +124,6 @@ def get_task_keys():
     # logger.debug(time_keys.keys())
     return time_keys
 
+
+def namespace(group_name):
+        return '%s:%s' % (REDIS_GROUP_NAMESPACE, group_name)
