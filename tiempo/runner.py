@@ -2,6 +2,7 @@ import datetime
 
 from hendrix.contrib.async.messaging import hxdispatcher
 from twisted.internet import threads
+from constants import BUSY, IDLE
 
 from tiempo.conn import REDIS
 from tiempo.utils import utc_now, namespace
@@ -16,7 +17,12 @@ class Runner(object):
 
     def __init__(self, number, thread_group_list):
         logger.info("Starting Thread manager %s with threads %s (%s)" % (number, thread_group_list, id(self)))
-        RUNNERS.append(self)
+        for i in thread_group_list:
+            if RUNNERS.has_key(i):
+                RUNNERS[i].append(self)
+            else:
+                RUNNERS[i] = [self]
+
         self.active_task_string = None
         self.current_job = None
         self.task_groups = thread_group_list
@@ -30,6 +36,7 @@ class Runner(object):
 
     def run(self):
 
+        # If we have a current Job, return BUSY and go no further.
         if self.current_job:
             logger.debug("Worker %s is busy with %s (%s / %s)" % (
                 self.number,
@@ -37,8 +44,9 @@ class Runner(object):
                 self.current_job.task.key,
                 self.current_job.uid)
             )
-            return
+            return BUSY
 
+        # ...otherwise, look for a Job to run.
         for g in self.task_groups:
 
                 msg = '%r checking for work in group %r' % (self, g)
@@ -53,21 +61,28 @@ class Runner(object):
                     break
 
         if self.active_task_string:
-            return threads.deferToThread(run_task, self.active_task_string, self)
+            d = threads.deferToThread(run_task, self.active_task_string, self)
+            return d
+        else:
+            return IDLE
+
+    def finish_job(self, result):
+        self
 
 
-def run_task(job_string, thread):
+def run_task(job_string, runner):
     try:
         task = Job.rehydrate(job_string)
 
         try:
+            runner.current_job = task.current_job
             task.run()
         except Exception, e:
             # print traceback.format_exc()
             # task.finish(traceback.format_exc())
             raise  #####
 
-        hxdispatcher.send('all_tasks', {'runner': thread.number,
+        hxdispatcher.send('all_tasks', {'runner': runner.number,
                                         'time': utc_now().isoformat(),
                                         'message': task.key,
                                         'code_word': task.current_job.code_word})

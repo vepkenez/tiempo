@@ -183,12 +183,12 @@ starting at %(start)s"""%data
         # Announce that job is queued.
         self.enqueued = utc_now().isoformat()
         self.status = "queued"
-        d = self._encode(self.data)
-
-        REDIS.rpush(queue_name, d)
-
-        logger.debug("Queing %s" % self.code_word)
         self.announce('job_queue')
+        logger.debug("Queueing %s" % self.code_word)
+
+
+        d = self._encode(self.data)
+        REDIS.rpush(queue_name, d)
 
         return self.data['uid']
 
@@ -271,6 +271,7 @@ class Task(TaskBase):
         self.hour = None
         self.minute = None
         self.periodic = False
+        self.current_job = None
 
         self.code_word = None
         self.generate_code_word()
@@ -350,8 +351,6 @@ class Task(TaskBase):
                 *getattr(self, 'args_to_function', ()),
                 **getattr(self, 'kwargs_to_function', {})
             )
-            self.current_job.finish()
-
             return result
 
         except Exception as e:
@@ -412,6 +411,9 @@ class Task(TaskBase):
             return '.'.join(sched)
 
     def next_expiration_dt(self):
+        '''
+        The next future datetime at which this trabajo's waiting period will expire.
+        '''
         if hasattr(self, 'force_interval'):
             expiration_dt = utc_now() + datetime.timedelta(
                 seconds=self.force_interval
