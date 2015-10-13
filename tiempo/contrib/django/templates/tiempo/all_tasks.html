@@ -20,44 +20,49 @@
                     <md-list-item>
                         <div flex='100' layout='row' layout-align='space-around center'>
                             <div flex='10'>Runner</div>
-                            <div flex='20'>Job Name</div>
+                            <div flex='20'>Job Code Name</div>
                             <div flex='30'>Time</div>
-                            <div flex='40'>Message</div>
+                            <div flex='40'>Activity</div>
                         </div>
                     </md-list-item>
 
 
-                    <div ng-repeat='runner in runners'>
+                    <div ng-repeat='(id, runner) in tiempo.runners'>
                         <md-divider></md-divider>
                         <md-list-item>
                             <div flex='100'layout='row' layout-align='space-around center'>
-                                <div flex='10'>[{runner.runner}]</div>
+                                <div flex='10'>[{id}]</div>
                                 <div flex='20'>[{runner.code_word}]</div>
-                                <div flex='30'>[{runner.time | date:'short'}]</div>
+                                <div flex='30'>
+                                    <span am-time-ago="runner.time"</span>
+                                </div>
                                 <div flex='40'>[{runner.message}]</div>
                             </div>
                         </md-list-item>
                     </div>
 
                     <!-- Queue -->
-                    <div ng-if="jobs|filter:{status:queued}.length">
+                    <div ng-if="tiempo.jobs|filter:{status:queued}.length">
                         <h2>Job Queue</h2>
 
                         <md-list-item>
                             <div flex='100' layout='row' layout-align='space-around center'>
-                                <div flex='20'>Name</div>
-                                <div flex='50'>Task</div>
-                                <div flex='30'>Enqueued</div>
+                                <div flex='10'>Name</div>
+                                <div flex='40'>Task Path</div>
+                                <div flex='20'>Enqueued</div>
+                                <div flex='20'>Status</div>
                             </div>
                         </md-list-item>
 
-                        <div ng-repeat='(uid, job) in jobs'>
+                        <div ng-repeat='(uid, job) in tiempo.jobs'>
                             <md-divider></md-divider>
                             <md-list-item>
                                 <div flex='100'layout='row' layout-align='space-around center'>
-                                    <div flex='10'>[{job.job}]</div>
+                                    <div flex='10'>[{job.code_word}]</div>
                                     <div flex='40'>[{job.key}]</div>
-                                    <div flex='20'>[{job.enqueued}]</div>
+                                    <div flex='20'>
+                                        <span am-time-ago="job.enqueued"</span>
+                                    </div>
                                     <div flex='20'>[{job.status}]</div>
                                 </div>
                             </md-list-item>
@@ -75,13 +80,16 @@
                         </div>
                     </md-list-item>
 
-                    <div ng-repeat='task in tasks'>
+                    <div ng-repeat='(id, task) in tiempo.tasks'>
                         <md-divider></md-divider>
                         <md-list-item>
                             <div flex='100'layout='row' layout-align='space-around center'>
                                 <div flex="20">[{task.code_word}]</div>
-                                <div flex='40'>[{task.path}]</div>
-                                <div flex='40'>[{task.id}] [{task.next_run_time | daysTill}]</div>
+                                <div flex='30'>[{task.path}]</div>
+                                <div flex='30'>[{task.id}]</div>
+                                <div flex="20">
+                                    <span am-time-ago="task.next_run_time"</span>
+                                </div>
                             </div>
                         </md-list-item>
                     </div>
@@ -97,6 +105,8 @@
         <script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.6/moment.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-moment/1.0.0-beta.2/angular-moment.min.js"></script>
         <script type="text/javascript">
 
             angular.module('CustomInterpolation', [])
@@ -105,58 +115,12 @@
                 $interpolateProvider.endSymbol('}]');
             });
 
-
-            // datetime filter
-            angular.module('DaysTillFilter', [])
-            .filter('daysTill', function(){
-                var secsInDay = 24*60*60;
-                var pluralizer = function(time, unit){
-                    var total = time + ' '+ unit;
-                    total += (time === 1) ? '' : 's';
-                    return total;
-                };
-                return function (date, close, dayMode){
-                    close = close || ' closed';
-                    date = (date instanceof Date) ? date : Date.parse(date);
-                    var secs = ((date - new Date())/1000);
-                    if(secs <= 0) return '0' + close;
-                    if(dayMode) {
-                        var days = Math.round(secs/secsInDay);
-                        if(days > 0) {
-                            return pluralizer(days, 'day');
-                        }
-                        else {
-                            return '< 1 day';
-                        }
-                    }
-                    else {
-                        var myString = '';
-                        var remains = 0;
-                        secs = Math.round(secs);
-                        if (secs > 360) {
-                            var hours = Math.floor(secs / 360)
-                            myString += ' ' + pluralizer(hours, 'hour');
-                            secs = secs - (hours*360);
-                        }
-                        if (secs > 60) {
-                          var minutes = Math.floor(secs / 60);
-                          myString += ' ' + pluralizer(minutes, 'minute');
-                          secs = secs - (minutes*60);
-                        }
-                        myString += ' ' + pluralizer(secs, 'second');
-                        return myString;
-                    }
-                };
-            });
-
             angular.module('TiempoController', [])
             .controller('TiempoController', function($scope){
 
-                var sock = new SockJS('192.168.1.145:8000/messages/main/');
+                var sock = new SockJS('/messages/main/');
 
-                $scope.jobs = {};
-                $scope.tasks = [];
-                $scope.runners = [];
+                $scope.tiempo = {};
 
                 sock.onopen = function(e) {
                     sock.send(
@@ -165,46 +129,37 @@
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'job_queue'})
                     );
+                    sock.send(
+                        JSON.stringify({'hx_subscribe': 'runners'})
+                    );
                 };
 
                 sock.onmessage = function(e) {
 
                     var message = JSON.parse(e.data);
 
-                    if ('canonical' in message) {
-
-                       // Push this task to the task list - either a new instance or update an existing one.
-
-                       var taskIndex = _.findIndex($scope.tasks, function(obj){
-                           return obj.path == message.path;
-                       });
-
-                       if (taskIndex == -1){ // This is a new task.
-                           $scope.tasks.push(message);
-                       } else { // This is an existing task that we need to update.
-                           $scope.tasks[taskIndex] = message;
-                           }
+                    // Just return if this is maintenance stuff.
+                    if ("setup_connection" in message) {
+                        return;
                     }
 
-                    if ('runner' in message) {
-                        var runnerIndex = _.findIndex($scope.runners, function(obj){
-                            return obj.runner == message.runner;
-                        })
-                        if (runnerIndex == -1) {
-                            $scope.runners.push(message);
-                        }
-                        else {
-                            $scope.runners[runnerIndex] = message;
-                        }
+                    if ("message" in message && message.message.indexOf("<HTTPChannel") == 0) {
+                        return;
+                    }
+                    ////// End connection maintainence.
+
+                    var key = Object.keys(message); // Will be "runners" or "tasks" or something.
+                    var objects = message[key]
+
+                    // Make sure we know about this type of object.
+                    if (!(key in $scope.tiempo)) {
+                        $scope.tiempo[key] = {};
                     }
 
-                    if ('job' in message) {
 
-                        if (message.status == "finished") {
-                            delete $scope.jobs[message.job_uid];  // TODO: Fade out somehow.
-                        } else {
-                            $scope.jobs[message.job_uid] = message;
-                        }
+                    // Take each object in the message and push it to a list of like objects.
+                    for (var objectId in objects) {
+                       $scope.tiempo[key][objectId] = objects[objectId];
                     }
 
                     $scope.$apply(); // Update the scope for every message on the socket.
@@ -216,7 +171,7 @@
                 'ngMaterial',
                 'TiempoController',
                 'CustomInterpolation',
-                'DaysTillFilter'
+                'angularMoment',
             ]);
 
         </script>

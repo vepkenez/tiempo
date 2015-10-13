@@ -14,6 +14,11 @@ import traceback
 
 
 class Runner(object):
+    '''
+    Runs Jobs.
+
+    During tiempo_loop, each runner is given a chance to run a job in the queue.
+    '''
 
     def __init__(self, number, thread_group_list):
         logger.info("Starting Thread manager %s with threads %s (%s)" % (number, thread_group_list, id(self)))
@@ -23,13 +28,13 @@ class Runner(object):
             else:
                 RUNNERS[i] = [self]
 
-        self.active_task_string = None
+        self.action_time = utc_now()
         self.current_job = None
         self.task_groups = thread_group_list
         self.number = number
 
     def __repr__(self):
-        return 'tiempo thread %d' % self.number
+        return 'Tiempo Runner %d' % self.number
 
     def cleanup(self):
         pass
@@ -46,36 +51,78 @@ class Runner(object):
             )
             return BUSY
 
-        # ...otherwise, look for a Job to run.
-        for g in self.task_groups:
+        # ...otherwise, look for a Job to run...
+        job_string = self.seek_job()
 
-                msg = '%r checking for work in group %r' % (self, g)
-                # logger.debug(msg)
-                name = namespace(g)
-                task = REDIS.lpop(name)
-                if task:
-                    logger.debug(
-                        'RUNNING TASK on thread %r: %s' % (self, task)
-                    )
-                    self.active_task_string = task
-                    break
-
-        if self.active_task_string:
-            d = threads.deferToThread(run_task, self.active_task_string, self)
+        # ...and run it.
+        if job_string:
+            self.action_time = utc_now()
+            logger.debug('%s adopting task: %s' % (self, job_string))
+            d = threads.deferToThread(run_task, job_string, self)
             return d
         else:
             return IDLE
 
+    def seek_job(self):
+        for g in self.task_groups:
+
+            logger.debug('%r checking for a Job in group %r' % (self, g))
+            group_key = namespace(g)
+            job_string = REDIS.lpop(group_key)
+            if job_string:
+                logger.info('%s found a Job in group %s: %s' % (self, g, job_string))
+                return job_string
+
     def finish_job(self, result):
-        self
+        self.action_time = utc_now()
+        self.current_job.finish()
+        self.current_job = None
+
+    def handle_error(self, failure):
+            failure.value
+
+    def serialize_to_dict(self):
+        if self.current_job:
+            code_word = self.current_job.code_word
+        else:
+            code_word = None
+
+        if self.current_job:
+            message = self.current_job.task.key
+        else:
+            message = "Idle"
+        d = {
+            'runner': self.number,
+            'code_word': code_word,
+            'time': self.action_time.isoformat(),
+            'message': message,
+        }
+        return d
+
+    def announce(self, channel):
+        hxdispatcher.send(channel,
+                          {
+                              'runners':
+                                  {
+                                      self.number: self.serialize_to_dict()
+                                  }
+                          }
+                          )
 
 
 def run_task(job_string, runner):
     try:
+        logger.debug("%s rehydrating %s" % (runner, job_string))
         task = Job.rehydrate(job_string)
+        logger.debug('%s running task: %s (%s)' % (runner, task.current_job.code_word, job_string))
 
         try:
-            runner.current_job = task.current_job
+            job = task.current_job  # TODO: Why do we expect this to be a Job object, rather than None?
+
+            if not job:
+                raise RuntimeError("Job isn't set yet.")
+
+            runner.current_job = job
             task.run()
         except Exception, e:
             # print traceback.format_exc()
@@ -87,7 +134,7 @@ def run_task(job_string, runner):
                                         'message': task.key,
                                         'code_word': task.current_job.code_word})
 
-        thread.running_task = None
+        runner.running_task = None
     except AttributeError as e:
-        thread.running_task = None
+        runner.running_task = None
         print traceback.format_exc()

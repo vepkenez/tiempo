@@ -20,7 +20,9 @@ def run():
         if not result in (BUSY, IDLE):
             # If the runner is neither busy nor idle, it will have returned a Deferred.
             result.addCallback(runner.finish_job)
+            result.addErrback(runner.handle_error)
 
+        runner.announce('runners')
 
     # 2) Queue up new tasks.
     for task_string, task in TIEMPO_REGISTRY.items():
@@ -39,9 +41,10 @@ def run():
 
             if stop_key_has_expired:
 
+                seconds_until_expiration = int(float((expire_key - this_loop_runtime).total_seconds())) - 1
                 REDIS.expire(
                     task.stop_key,
-                    int(float((expire_key - this_loop_runtime).total_seconds())) - 1
+                    seconds_until_expiration
                 )
 
                 # OK, we're ready to queue up a new job for this task!

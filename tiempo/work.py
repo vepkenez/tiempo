@@ -1,5 +1,5 @@
 from tiempo import RUNNERS
-from tiempo.utils import utc_now, namespace
+from tiempo.utils import utc_now, namespace, task_time_keys
 from hendrix.contrib.async.messaging import hxdispatcher
 from twisted.internet import task
 
@@ -23,7 +23,6 @@ import base64
 import importlib
 import functools
 import datetime
-import traceback
 import json
 import random
 from twisted.logger import Logger
@@ -37,9 +36,11 @@ def announce_tasks_to_client():
         '''
         Push the list of tasks to the client.
         '''
+        task_dict = {}
+
         for task in TIEMPO_REGISTRY.values():
-            serialized_task = task.serialize_to_dict()
-            hxdispatcher.send('all_tasks', serialized_task)
+            task_dict[task.key] = task.serialize_to_dict()
+            hxdispatcher.send('all_tasks', {"tasks": task_dict})
 
 task.LoopingCall(announce_tasks_to_client).start(2)
 
@@ -57,8 +58,8 @@ class Job(object):
         self.enqueued = False
 
     def serialize_to_dict(self):
-        d = {'job': self.code_word,
-             'job_uid': self.uid,
+        d = {'uid': self.uid,
+             'code_word': self.code_word,
              'key': self.task.key,
              'enqueued': self.enqueued,
              'status': self.status,
@@ -71,7 +72,6 @@ class Job(object):
         whenever a worker participating in this task's groups
         comes up as available
         """
-        logger.debug('scheduling task %s for next available execution' % self)
 
         queue_name = kwargs.pop('tiempo_wait_for', None)
 
@@ -95,9 +95,9 @@ class Job(object):
     def finish(self, error=None):
         try:
             logger.debug('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
-        except AttributeError:
+        except AttributeError, e:
             # Somehow this job finished without ever being started.
-            self
+            raise
 
         self._enqueue_dependents()
 
@@ -105,7 +105,7 @@ class Job(object):
 
         data = {
             'key': self.task.key,
-            'uid':self.uid,
+            'uid': self.uid,
             'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
             'finished': now.strftime('%y/%m/%d %I:%M%p'),
             'elapsed': (now - self.start_time).seconds,
@@ -145,7 +145,9 @@ starting at %(start)s"""%data
         self.announce('job_queue')
 
     def announce(self, channel):
-        return hxdispatcher.send(channel, self.serialize_to_dict())
+        hxdispatcher.send(channel, {'jobs':
+                                        {self.uid: self.serialize_to_dict()}
+                                    })
 
     def _freeze(self, *args, **kwargs):
 
@@ -184,11 +186,11 @@ starting at %(start)s"""%data
         self.enqueued = utc_now().isoformat()
         self.status = "queued"
         self.announce('job_queue')
-        logger.debug("Queueing %s" % self.code_word)
 
+        job_string = self._encode(self.data)
+        logger.debug("Queueing %s: %s" % (self.code_word, job_string))
 
-        d = self._encode(self.data)
-        REDIS.rpush(queue_name, d)
+        REDIS.rpush(queue_name, job_string)
 
         return self.data['uid']
 
@@ -209,13 +211,8 @@ starting at %(start)s"""%data
 
     @classmethod
     def _encode(cls, dictionary):
-        "Returns the given session dictionary pickled and encoded as a string."
-        try:
-            pickled = pickle.dumps(dictionary, pickle.HIGHEST_PROTOCOL)
-        except pickle.PicklingError as E:
-            msg = "PICKLING ERROR.  You have some complex data in the arguments to %r that cannot be pickled"%self
-            print msg
-            raise E(msg)
+        pickled = pickle.dumps(dictionary, pickle.HIGHEST_PROTOCOL)
+
         return base64.b64encode(pickled).decode('ascii')
 
     @staticmethod
@@ -225,7 +222,10 @@ starting at %(start)s"""%data
         try:
             # could produce ValueError if there is no ':'
             pickled = encoded_data
-            dec = pickle.loads(pickled)
+            try:
+                dec = pickle.loads(pickled)
+            except pickle.UnpicklingError, e:
+                pickled
 
             return dec
 
@@ -321,14 +321,19 @@ class Task(TaskBase):
         return '%s:schedule:%s:stop' % (namespace(self.group), self.key)
 
     def generate_code_word(self):
-        self.code_word = random.choice(WORDS)
+        word = random.choice(WORDS)
+        self.code_word = unicode(word, encoding="UTF-8")
         return self.code_word
 
     def serialize_to_dict(self):
+        next_run_time = self.next_expiration_dt()
+        if next_run_time:
+            next_run_time = next_run_time.isoformat()
+
         task_as_dict = {
-            'canonical': True,
             'code_word': self.code_word,
-            'path': self.key
+            'path': self.key,
+            'next_run_time': next_run_time,
         }
         return task_as_dict
 
@@ -345,18 +350,12 @@ class Task(TaskBase):
 
         self.current_job.start()
 
-        try:
-            func = self._get_function()
-            result = func(
-                *getattr(self, 'args_to_function', ()),
-                **getattr(self, 'kwargs_to_function', {})
-            )
-            return result
-
-        except Exception as e:
-            raise #############
-            errtext = traceback.format_exc()
-            self.finish(error=errtext)
+        func = self._get_function()
+        result = func(
+            *getattr(self, 'args_to_function', ()),
+            **getattr(self, 'kwargs_to_function', {})
+        )
+        return result
 
     def _thaw(self, data=None):
         """
@@ -419,12 +418,15 @@ class Task(TaskBase):
                 seconds=self.force_interval
             )
         else:
-            run_times = get_task_keys()
+            run_times = task_time_keys()
             expiration_dt = run_times.get(self.get_schedule())
 
         return expiration_dt
     
     def spawn_job(self):
+        '''
+        Create a Job object for this task and push it to the queue.
+        '''
         job = Job(self)
         job.soon()
         self.current_job = job

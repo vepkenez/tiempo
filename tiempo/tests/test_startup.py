@@ -1,6 +1,6 @@
 from unittest.case import TestCase
 from tiempo.conn import REDIS
-from tiempo.task import Task
+from tiempo.work import Task
 from sample_tasks import some_callable
 from tiempo import TIEMPO_REGISTRY
 
