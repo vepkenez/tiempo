@@ -3,6 +3,14 @@
     <head>
         <title>Reelio Tiempo Dashboard</title>
         <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.css">
+
+        <style type="text/css">
+            .job.ng-animate {
+                background-color: teal;
+            }
+
+        </style>
+
     </head>
     <body ng-app='app'>
         <md-toolbar>
@@ -42,7 +50,7 @@
                     </div>
 
                     <!-- Queue -->
-                    <div ng-if="tiempo.jobs|filter:{status:queued}.length">
+                    <div ng-if="tiempo.jobs">
                         <h2>Job Queue</h2>
 
                         <md-list-item>
@@ -54,7 +62,7 @@
                             </div>
                         </md-list-item>
 
-                        <div ng-repeat='(uid, job) in tiempo.jobs'>
+                        <div ng-repeat='(uid, job) in tiempo.jobs' class="job">
                             <md-divider></md-divider>
                             <md-list-item>
                                 <div flex='100'layout='row' layout-align='space-around center'>
@@ -99,15 +107,43 @@
         </div>
 
         <!-- Javascript -->
-        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
-        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-animate.min.js"></script>
-        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular-aria.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular-animate.min.js"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular-aria.min.js"></script>
         <script src="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.0.3/sockjs.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.10.6/moment.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/angular-moment/1.0.0-beta.2/angular-moment.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/velocity/1.2.3/velocity.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/velocity/1.2.3/velocity.ui.min.js"></script>
+
         <script type="text/javascript">
+
+            var tiempoKiosk = angular.module('app', [
+                'ngAnimate',
+                'ngMaterial',
+                'TiempoController',
+                'CustomInterpolation',
+                'angularMoment',
+            ]);
+
+            tiempoKiosk.animation('.job', [function() {
+                  return {
+                    enter: function(element, doneFn) {
+                        Velocity(element, "transition.flipBounceYIn");
+                        Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
+                    },
+
+                    move: function(element, doneFn) {
+
+                    },
+
+                    leave: function(element, doneFn) {
+
+                    }
+                  }
+            }]);
 
             angular.module('CustomInterpolation', [])
             .config(function($interpolateProvider) {
@@ -167,12 +203,7 @@
 
             });
 
-            angular.module('app', [
-                'ngMaterial',
-                'TiempoController',
-                'CustomInterpolation',
-                'angularMoment',
-            ]);
+
 
         </script>
     </body>

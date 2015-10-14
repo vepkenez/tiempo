@@ -152,17 +152,13 @@ starting at %(start)s"""%data
     def _freeze(self, *args, **kwargs):
 
         """
-            creates a 'data' object which will be serialized and pushed into redis
-            when this task is queued for execution.
+        creates a 'data' object which will be serialized and pushed into redis
+        when this task is queued for execution.
 
-            this data object should contain everything needed to reconstitute and
-            execute the original function with args and kwargs in the context
-            of a worker process
+        this data object should contain everything needed to reconstitute and
+        execute the original function with args and kwargs in the context
+        of a worker process
         """
-
-        # make a fresh uid specific to this instance that will persist
-        # through getting saved to the queue
-        self.uid = str(uuid.uuid1())
 
         self.data = {
             'function_module_path': inspect.getmodule(self.task._get_function()).__name__,
@@ -256,11 +252,7 @@ starting at %(start)s"""%data
         return T
 
 
-class TaskBase(object):
-    pass
-
-
-class Task(TaskBase):
+class Task(object):
 
     def __repr__(self):
         return self.key
@@ -273,12 +265,12 @@ class Task(TaskBase):
         self.periodic = False
         self.current_job = None
 
-        self.code_word = None
+        self.uid = str(uuid.uuid1())
         self.generate_code_word()
 
         self.key = ''
         self.function_name = None
-        self.group = unicode(kwargs.get('priority', kwargs.get('group','1')))  # TODO: refactor priority
+        self.group = unicode(kwargs.get('priority', kwargs.get('group', '1')))  # TODO: refactor priority
 
         self.frozen = False
         # group and other attrs may be overridden here.
