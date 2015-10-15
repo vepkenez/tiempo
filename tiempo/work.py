@@ -32,6 +32,17 @@ word_file = "/usr/share/dict/words"
 WORDS = open(word_file).read().splitlines()
 
 
+def all_jobs(groups):
+    '''
+    Find all Jobs in the list of groups, return them as a dict.
+    '''
+    jobs_dict = {}
+    for group in groups:
+        name = namespace(group)
+        jobs_dict[group] = REDIS.lrange(name, 0, -1)
+    return jobs_dict
+
+
 def announce_tasks_to_client():
         '''
         Push the list of tasks to the client.
@@ -50,12 +61,25 @@ class Job(object):
     A task running right now.
     '''
 
-    def __init__(self, task):
-        self.uid = str(uuid.uuid1())
-        self.code_word = task.code_word
+    def __init__(self, task, reconstitute_from=None):
         self.task = task
+
+        if reconstitute_from:
+            self.uid = reconstitute_from['uid']
+            self.code_word = reconstitute_from['code_word']
+        else:
+            self.uid = str(uuid.uuid4())
+            self.code_word = task.code_word
         self.status = 'waiting'
         self.enqueued = False
+
+    def __str__(self):
+        return "Job: %s / %s - (Task: %s, %s)" % (
+            self.code_word,
+            self.uid,
+            self.task.key,
+            self.task.uid
+        )
 
     def serialize_to_dict(self):
         d = {'uid': self.uid,
@@ -167,6 +191,7 @@ starting at %(start)s"""%data
             'kwargs_to_function': kwargs,
             'schedule': self.task.get_schedule(),
             'uid': self.uid,
+            'code_word': self.code_word,
         }
         self.frozen = True
 
@@ -184,8 +209,7 @@ starting at %(start)s"""%data
         self.announce('job_queue')
 
         job_string = self._encode(self.data)
-        logger.debug("Queueing %s: %s" % (self.code_word, job_string))
-
+        logger.info("Queueing %s: %s - %s" % (self.code_word, self.data["function_name"], self.data['uid']))
         REDIS.rpush(queue_name, job_string)
 
         return self.data['uid']
@@ -205,51 +229,31 @@ starting at %(start)s"""%data
 
             self._enqueue_dependents()
 
-    @classmethod
     def _encode(cls, dictionary):
-        pickled = pickle.dumps(dictionary, pickle.HIGHEST_PROTOCOL)
-
-        return base64.b64encode(pickled).decode('ascii')
+        return json.dumps(dictionary)
 
     @staticmethod
     def _decode(data):
-
-        encoded_data = base64.b64decode(force_bytes(data))
-        try:
-            # could produce ValueError if there is no ':'
-            pickled = encoded_data
-            try:
-                dec = pickle.loads(pickled)
-            except pickle.UnpicklingError, e:
-                pickled
-
-            return dec
-
-        except Exception:
-            raise
-            # ValueError, SuspiciousOperation, unpickling exceptions. If any of
-            # these happen, just return an empty dictionary (an empty session).
-            return {}
+        return json.loads(data)
 
     @staticmethod
-    def rehydrate(base_64):
+    def rehydrate(byte_string):
 
-        d = Job._decode(base_64)
+        d = Job._decode(byte_string)
 
         module = importlib.import_module(d['function_module_path'])
-        T = getattr(module, d['function_name'])
+        t = getattr(module, d['function_name'])
 
-        if not isinstance(T, Task):
+        if not isinstance(t, Task):
             # if the function that this task decorates is imported from
             # a different file path than where the decorating task is instantiated,
             # it will not be wrapped normally
             # so we wrap it.
 
-            T = Task(T)
+            t = Task(t)
 
-        T.data = d
-        T._thaw()
-        return T
+        job = Job(reconstitute_from=d, task=t)
+        return job
 
 
 class Task(object):
@@ -265,7 +269,7 @@ class Task(object):
         self.periodic = False
         self.current_job = None
 
-        self.uid = str(uuid.uuid1())
+        self.uid = str(uuid.uuid4())
         self.generate_code_word()
 
         self.key = ''
@@ -329,18 +333,10 @@ class Task(object):
         }
         return task_as_dict
 
-    def run(self, job=None):
+    def run(self):
         """
         run right now
         """
-
-        if job:
-            self.current_job = job
-
-        if not self.current_job:
-            raise TypeError("Task must be run by a Job.")
-
-        self.current_job.start()
 
         func = self._get_function()
         result = func(
@@ -421,9 +417,18 @@ class Task(object):
         '''
         job = Job(self)
         job.soon()
-        self.current_job = job
+
 
         # Now we generate a new code word for next time.
         self.generate_code_word()
+
+        logger.info("Spawned job %s (%s) for %s (%s).  Code word next time: %s" % (
+                        job.code_word,
+                        job.uid,
+                        self.key,
+                        self.uid,
+                        self.code_word
+                        )
+                    )
 
         return job

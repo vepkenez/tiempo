@@ -13,18 +13,20 @@ def run():
     this_loop_runtime = utc_now()
 
     # This loop basically does two things:
+
+    # Thing 1) Let the runners pick up any queued tasks.
     for runner in all_runners():
-        # 1) Let the runners pick up any queued tasks.
-        result = runner.run()
+
+        result = runner.cycle()
 
         if not result in (BUSY, IDLE):
             # If the runner is neither busy nor idle, it will have returned a Deferred.
-            result.addCallback(runner.finish_job)
-            result.addErrback(runner.handle_error)
+            # We add our paths for success and failure here.
+            result.addCallbacks(runner.finish_job, runner.handle_error)
 
-        runner.announce('runners')
+        runner.announce('runners')  # The runner may have changed state; announce it.
 
-    # 2) Queue up new tasks.
+    # Thing 2) Queue up new tasks.
     for task_string, task in TIEMPO_REGISTRY.items():
 
         ### REPLACE with task.next_expiration_dt()
