@@ -33,6 +33,7 @@ class Runner(object):
         self.current_job = None
         self.task_groups = thread_group_list
         self.number = number
+        self.error_state = False
 
     def __repr__(self):
         return 'Tiempo Runner %d' % self.number
@@ -102,11 +103,16 @@ class Runner(object):
         self.current_job.finish()
         self.current_job = None
         self.announce('runners')
+        self.error_state = False
+        return  # And go back to cycling.
 
     def handle_error(self, failure):
+        self.error_state = True
         logger.error(failure.value)
-        # TODO: Announce error. 
-	# failure.raiseException()
+        d = self.serialize_to_dict()
+        d.update({'error_message': str(failure.value)})
+        hxdispatcher.send('errors', {'errors': {self.current_job.uid: d}})
+        return self.finish_job(failure)
 
     def serialize_to_dict(self, alert=False):
         if self.current_job:
@@ -127,6 +133,7 @@ class Runner(object):
             'message': message,
             'jobUid': job_uid,
             'alert': alert,
+            'error': self.error_state,
         }
         return d
 

@@ -9,6 +9,25 @@
                 background-color: teal;
             }
 
+            #errorContainer {
+              position: absolute;
+              right: 0;
+            }
+            .error {
+              border: 2px solid red;
+              margin-top: 10px;
+              background-color: rgb(255, 233, 233);
+            }
+
+            .errorText {
+              font-size:25px;
+            }
+
+            #kioskRowAreas {
+            width:60%;
+            }
+
+
         </style>
 
     </head>
@@ -20,7 +39,16 @@
         </md-toolbar>
 
         <div ng-controller='TiempoController' layout-padding>
-            <div layout='row'>
+            <div id="errorContainer">
+                <div ng-repeat="error in tiempo.errors" class="error">
+                    <h4>Error in job "[{error.codeWord}]"</h4>
+                    <div>Path: [{error.message}]</div>
+                    <div>Uid: [{error.jobUid}])</div>
+                    <div class="errorText">[{error.error_message}]</div>
+                </div>
+            </div>
+
+            <div layout='row' id="kioskRowAreas">
                 <md-list flex='100' class='md-whiteframe-1dp'>
 
                     <!-- Runners -->
@@ -37,12 +65,12 @@
 
                     <div ng-repeat='(id, runner) in tiempo.runners'>
                         <md-divider></md-divider>
-                        <md-list-item running-alert="runner.jobUid">
+                        <md-list-item running-alert="runner.jobUid" error-state="runner.error">
                             <div flex='100'layout='row' layout-align='space-around center'>
                                 <div flex='10'>[{id}]</div>
                                 <div flex='20'>[{runner.codeWord}]</div>
                                 <div flex='30'>
-                                    <span am-time-ago="runner.time"</span>
+                                    <span am-time-ago="runner.time"></span>
                                 </div>
                                 <div flex='40'>[{runner.message}]</div>
                             </div>
@@ -166,6 +194,9 @@
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'runners'})
                     );
+                    sock.send(
+                        JSON.stringify({'hx_subscribe': 'errors'})
+                    );
                     sock.send('updateJobs');
                 };
 
@@ -185,7 +216,8 @@
 
                     var key = Object.keys(message); // Will be "runners" or "tasks" or something.
                     var objects = message[key]
-                    console.log("Received " + Object.keys(objects).length + " " + key)
+                    // console.log("Received " + Object.keys(objects).length + " " + key);
+                    // console.log(objects);
 
                     // Make sure we know about this type of object.
                     if (!(key in $scope.tiempo)) {
@@ -203,31 +235,17 @@
 
             });
 
-            tiempoKiosk.animation('.job', [function() {
-                  return {
-                    enter: function(element, doneFn) {
-                        Velocity(element, "transition.flipBounceYIn");
-                        Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
-                    },
-
-                    move: function(element, doneFn) {
-
-                    },
-
-                    leave: function(element, doneFn) {
-
-                    },
-
-                    alertRunning: function(element, doneFn) {
-                        console.log("Running " + element);
-                    }
-                  }
-            }]);
-
             tiempoKiosk.directive('runningAlert', function($animate) {
               return function(scope, runnerElem, attr) {
+                  scope.$watch(attr.errorState, function(nv, ov) {
+                    if (nv) {
+                      Velocity(runnerElem, { 'backgroundColor': '#FFE9E9' });
+                      Velocity(runnerElem, "transition.slideRightBigOut");
+                    }
+                  })
                   scope.$watch(attr.runningAlert, function(nv, ov) {
                     if (nv) {
+                        alertRunningSequence = false;
                         jobObj = scope.tiempo['jobs'][nv];
                         if (jobObj) {
                             jobElem = document.getElementById('j' + nv);
@@ -249,10 +267,30 @@
                         ]
 
                     }
-                    Velocity.RunSequence(alertRunningSequence);
+                    if (alertRunningSequence) {
+                      Velocity.RunSequence(alertRunningSequence);
+                    }
                   })
               }
             });
+
+            tiempoKiosk.animation('.job', [function() {
+                  return {
+                    enter: function(element, doneFn) {
+                        Velocity(element, "transition.flipBounceYIn");
+                        Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
+                    },
+                  }
+            }]);
+            tiempoKiosk.animation('.error', [function() {
+                  return {
+                    enter: function(element, doneFn) {
+                        Velocity(element, "transition.slideLeftBigIn");
+                    },
+                  }
+            }]);
+
+
 
     Velocity.RegisterEffect("alertRunning", {
         calls: [
