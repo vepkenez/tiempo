@@ -1,10 +1,14 @@
+import datetime
+
 from twisted.internet import task
-from constants import BUSY, IDLE
-from tiempo import RUNNERS, TIEMPO_REGISTRY, all_runners
 from twisted.logger import Logger
+from twisted.internet import reactor
+
+from constants import BUSY, IDLE
+from tiempo import TIEMPO_REGISTRY, all_runners
 from tiempo.conn import REDIS
 from tiempo.utils import utc_now, task_time_keys
-import datetime
+
 
 logger = Logger()
 

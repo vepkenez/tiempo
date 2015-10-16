@@ -9,6 +9,8 @@ import datetime
 import pytz
 from dateutil.relativedelta import relativedelta
 from tiempo import REDIS_GROUP_NAMESPACE
+from tiempo.conn import REDIS
+
 
 def utc_now():
     return datetime.datetime.now(pytz.utc)
@@ -127,3 +129,14 @@ def task_time_keys():
 
 def namespace(group_name):
         return '%s:%s' % (REDIS_GROUP_NAMESPACE, group_name)
+
+
+def all_jobs(groups):
+    '''
+    Find all Jobs in the list of groups, return them as a dict.
+    '''
+    jobs_dict = {}
+    for group in groups:
+        name = namespace(group)
+        jobs_dict[group] = REDIS.lrange(name, 0, -1)
+    return jobs_dict

@@ -32,17 +32,6 @@ word_file = "/usr/share/dict/words"
 WORDS = open(word_file).read().splitlines()
 
 
-def all_jobs(groups):
-    '''
-    Find all Jobs in the list of groups, return them as a dict.
-    '''
-    jobs_dict = {}
-    for group in groups:
-        name = namespace(group)
-        jobs_dict[group] = REDIS.lrange(name, 0, -1)
-    return jobs_dict
-
-
 def announce_tasks_to_client():
         '''
         Push the list of tasks to the client.
@@ -51,9 +40,9 @@ def announce_tasks_to_client():
 
         for task in TIEMPO_REGISTRY.values():
             task_dict[task.key] = task.serialize_to_dict()
-            hxdispatcher.send('all_tasks', {"tasks": task_dict})
+        hxdispatcher.send('all_tasks', {"tasks": task_dict})
 
-task.LoopingCall(announce_tasks_to_client).start(2)
+task.LoopingCall(announce_tasks_to_client).start(5)
 
 
 class Job(object):
@@ -66,11 +55,12 @@ class Job(object):
 
         if reconstitute_from:
             self.uid = reconstitute_from['uid']
-            self.code_word = reconstitute_from['code_word']
+            self.code_word = reconstitute_from['codeWord']
+            self.status = 'queued'
         else:
             self.uid = str(uuid.uuid4())
             self.code_word = task.code_word
-        self.status = 'waiting'
+            self.status = 'waiting'
         self.enqueued = False
 
     def __str__(self):
@@ -83,10 +73,11 @@ class Job(object):
 
     def serialize_to_dict(self):
         d = {'uid': self.uid,
-             'code_word': self.code_word,
+             'codeWord': self.code_word,
              'key': self.task.key,
              'enqueued': self.enqueued,
              'status': self.status,
+             'taskUid': self.task.uid,
              }
         return d
 
@@ -191,7 +182,7 @@ starting at %(start)s"""%data
             'kwargs_to_function': kwargs,
             'schedule': self.task.get_schedule(),
             'uid': self.uid,
-            'code_word': self.code_word,
+            'codeWord': self.code_word,
         }
         self.frozen = True
 
@@ -327,9 +318,10 @@ class Task(object):
             next_run_time = next_run_time.isoformat()
 
         task_as_dict = {
-            'code_word': self.code_word,
+            'codeWord': self.code_word,
             'path': self.key,
             'next_run_time': next_run_time,
+            'uid': self.uid,
         }
         return task_as_dict
 

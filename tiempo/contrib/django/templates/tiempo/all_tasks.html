@@ -37,10 +37,10 @@
 
                     <div ng-repeat='(id, runner) in tiempo.runners'>
                         <md-divider></md-divider>
-                        <md-list-item>
+                        <md-list-item running-alert="runner.jobUid">
                             <div flex='100'layout='row' layout-align='space-around center'>
                                 <div flex='10'>[{id}]</div>
-                                <div flex='20'>[{runner.code_word}]</div>
+                                <div flex='20'>[{runner.codeWord}]</div>
                                 <div flex='30'>
                                     <span am-time-ago="runner.time"</span>
                                 </div>
@@ -62,11 +62,11 @@
                             </div>
                         </md-list-item>
 
-                        <div ng-repeat='(uid, job) in tiempo.jobs' class="job">
+                        <div ng-repeat='(uid, job) in tiempo.jobs | jobsFilter' class="job" id="j[{uid}]">
                             <md-divider></md-divider>
                             <md-list-item>
                                 <div flex='100'layout='row' layout-align='space-around center'>
-                                    <div flex='10'>[{job.code_word}]</div>
+                                    <div flex='10'>[{job.codeWord}]</div>
                                     <div flex='40'>[{job.key}]</div>
                                     <div flex='20'>
                                         <span am-time-ago="job.enqueued"</span>
@@ -90,9 +90,9 @@
 
                     <div ng-repeat='(id, task) in tiempo.tasks'>
                         <md-divider></md-divider>
-                        <md-list-item>
+                        <md-list-item id="t[{task.uid}]">
                             <div flex='100'layout='row' layout-align='space-around center'>
-                                <div flex="20">[{task.code_word}]</div>
+                                <div flex="20">[{task.codeWord}]</div>
                                 <div flex='30'>[{task.path}]</div>
                                 <div flex='30'>[{task.id}]</div>
                                 <div flex="20">
@@ -126,24 +126,8 @@
                 'TiempoController',
                 'CustomInterpolation',
                 'angularMoment',
+                'tiempoFilters',
             ]);
-
-            tiempoKiosk.animation('.job', [function() {
-                  return {
-                    enter: function(element, doneFn) {
-                        Velocity(element, "transition.flipBounceYIn");
-                        Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
-                    },
-
-                    move: function(element, doneFn) {
-
-                    },
-
-                    leave: function(element, doneFn) {
-
-                    }
-                  }
-            }]);
 
             angular.module('CustomInterpolation', [])
             .config(function($interpolateProvider) {
@@ -151,12 +135,26 @@
                 $interpolateProvider.endSymbol('}]');
             });
 
+            angular.module('tiempoFilters', [])
+                .filter('jobsFilter', function() {
+                  return function(input, search) {
+                    if (!input) return input;
+                    var result = {};
+                    angular.forEach(input, function(value, key) {
+                        if (value.status == "queued") {
+                            result[key] = value;
+                        }
+                    });
+                    return result;
+                  }
+                });
+
             angular.module('TiempoController', [])
             .controller('TiempoController', function($scope){
 
-                var sock = new SockJS('/messages/main/');
-
                 $scope.tiempo = {};
+
+                var sock = new SockJS('/tiempo_communication/messages/');
 
                 sock.onopen = function(e) {
                     sock.send(
@@ -168,6 +166,7 @@
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'runners'})
                     );
+                    sock.send('updateJobs');
                 };
 
                 sock.onmessage = function(e) {
@@ -186,6 +185,7 @@
 
                     var key = Object.keys(message); // Will be "runners" or "tasks" or something.
                     var objects = message[key]
+                    console.log("Received " + Object.keys(objects).length + " " + key)
 
                     // Make sure we know about this type of object.
                     if (!(key in $scope.tiempo)) {
@@ -203,7 +203,64 @@
 
             });
 
+            tiempoKiosk.animation('.job', [function() {
+                  return {
+                    enter: function(element, doneFn) {
+                        Velocity(element, "transition.flipBounceYIn");
+                        Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
+                    },
 
+                    move: function(element, doneFn) {
+
+                    },
+
+                    leave: function(element, doneFn) {
+
+                    },
+
+                    alertRunning: function(element, doneFn) {
+                        console.log("Running " + element);
+                    }
+                  }
+            }]);
+
+            tiempoKiosk.directive('runningAlert', function($animate) {
+              return function(scope, runnerElem, attr) {
+                  scope.$watch(attr.runningAlert, function(nv, ov) {
+                    if (nv) {
+                        jobObj = scope.tiempo['jobs'][nv];
+                        if (jobObj) {
+                            jobElem = document.getElementById('j' + nv);
+                            taskElem = document.getElementById('t' + jobObj.taskUid)
+                            alertRunningSequence = [
+                                { e: jobElem, p: {'backgroundColor': '#FF9900'}},
+                                { e: taskElem, p: "alertRunning", o: { sequenceQueue: false}},
+                                { e: jobElem, p: 'transition.slideUpOut', o: { sequenceQueue: false}},
+                                { e: runnerElem, p: {'backgroundColor': '#FF9900'}, o: { sequenceQueue: false}},
+                                { e: runnerElem, p: 'transition.slideUpIn', o: { sequenceQueue: false}},
+                                { e: runnerElem, p: {'backgroundColor': '#fff'}, o: { sequenceQueue: false}},
+
+                            ]
+                        }
+                    } else {
+                        console.log("Job finished.");
+                        alertRunningSequence = [
+                        { e: runnerElem, p: 'transition.slideDownOut'},
+                        ]
+
+                    }
+                    Velocity.RunSequence(alertRunningSequence);
+                  })
+              }
+            });
+
+    Velocity.RegisterEffect("alertRunning", {
+        calls: [
+            [{'backgroundColor': '#FF9900'}, 0.001],
+            ['callout.pulse'],
+        ],
+        reset: {'backgroundColor': '#fff'}
+    })
 
         </script>
     </body>

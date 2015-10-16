@@ -79,7 +79,7 @@ class Runner(object):
                 job_dict = json.loads(job_string)
                 logger.info('%s found Job %s (%s) in group %s: %s' % (
                     self,
-                    job_dict['code_word'],
+                    job_dict['codeWord'],
                     job_dict['uid'],
                     g,
                     job_dict['function_name'],
@@ -91,13 +91,9 @@ class Runner(object):
         Run the current job's task.
         '''
         logger.debug('%s running task: %s' % (self, self.current_job.code_word))
+        self.announce('runners', alert=True)
         self.current_job.start()
         task = self.current_job.task
-
-        hxdispatcher.send('all_tasks', {'runner': self.number,
-                                        'time': utc_now().isoformat(),
-                                        'message': task.key,
-                                        'code_word': self.current_job.code_word})
 
         return task.run()
 
@@ -105,17 +101,20 @@ class Runner(object):
         self.action_time = utc_now()
         self.current_job.finish()
         self.current_job = None
+        self.announce('runners')
 
     def handle_error(self, failure):
         logger.error(failure.value)
         # TODO: Announce error. 
 	# failure.raiseException()
 
-    def serialize_to_dict(self):
+    def serialize_to_dict(self, alert=False):
         if self.current_job:
             code_word = self.current_job.code_word
+            job_uid = self.current_job.uid
         else:
             code_word = None
+            job_uid = None
 
         if self.current_job:
             message = self.current_job.task.key
@@ -123,18 +122,20 @@ class Runner(object):
             message = "Idle"
         d = {
             'runner': self.number,
-            'code_word': code_word,
+            'codeWord': code_word,
             'time': self.action_time.isoformat(),
             'message': message,
+            'jobUid': job_uid,
+            'alert': alert,
         }
         return d
 
-    def announce(self, channel):
+    def announce(self, channel, alert=False):
         hxdispatcher.send(channel,
                           {
                               'runners':
                                   {
-                                      self.number: self.serialize_to_dict()
+                                      self.number: self.serialize_to_dict(alert=alert)
                                   }
                           }
                           )
