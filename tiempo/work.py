@@ -42,15 +42,13 @@ def announce_tasks_to_client():
             task_dict[task.key] = task.serialize_to_dict()
         hxdispatcher.send('all_tasks', {"tasks": task_dict})
 
-task.LoopingCall(announce_tasks_to_client).start(5)
-
 
 class Job(object):
     '''
     A task running right now.
     '''
 
-    def __init__(self, task, reconstitute_from=None):
+    def __init__(self, task, reconstitute_from=None, report_handler=None):
         self.task = task
 
         if reconstitute_from:
@@ -78,6 +76,7 @@ class Job(object):
              'enqueued': self.enqueued,
              'status': self.status,
              'taskUid': self.task.uid,
+             'group': self.task.group,  # TODO: Maybe do this client side.
              }
         return d
 
@@ -209,7 +208,7 @@ starting at %(start)s"""%data
 
         obj = REDIS.lpop(self.task.waitfor_key)
         if obj:
-            awaiting_task = Task.rehydrate(obj)
+            awaiting_task = Trabajo.rehydrate(obj)
 
             print 'enqueing:', awaiting_task,'uid',awaiting_task.uid, 'with waitfor:', self.waitfor_key
 
@@ -235,25 +234,26 @@ starting at %(start)s"""%data
         module = importlib.import_module(d['function_module_path'])
         t = getattr(module, d['function_name'])
 
-        if not isinstance(t, Task):
+        if not isinstance(t, Trabajo):
             # if the function that this task decorates is imported from
             # a different file path than where the decorating task is instantiated,
             # it will not be wrapped normally
             # so we wrap it.
 
-            t = Task(t)
+            t = Trabajo(func=t)
 
         job = Job(reconstitute_from=d, task=t)
         return job
 
 
-class Task(object):
+class Trabajo(object):
 
     def __repr__(self):
         return self.key
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, report_to=None, *args, **kwargs):
 
+        self.report_handler = report_to
         self.day = None
         self.hour = None
         self.minute = None
@@ -402,14 +402,19 @@ class Task(object):
             expiration_dt = run_times.get(self.get_schedule())
 
         return expiration_dt
+
+
     
-    def spawn_job(self):
+    def spawn_job(self, default_report_handler=None):
         '''
         Create a Job object for this task and push it to the queue.
         '''
+
+        # If this task has a report handler, use it.  Otherwise, use a default if one is passed.
+        report_handler = self.report_handler or default_report_handler
+
         job = Job(self)
         job.soon()
-
 
         # Now we generate a new code word for next time.
         self.generate_code_word()
@@ -424,3 +429,13 @@ class Task(object):
                     )
 
         return job
+
+    def soon(self):
+        '''
+        Just like spawn_job(), but returns self instead of the job.
+        '''
+        self.spawn_job()
+        return self
+
+
+task = Trabajo  # For compatibility as a drop-in Celery replacement.

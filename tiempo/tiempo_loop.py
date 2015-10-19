@@ -8,9 +8,12 @@ from constants import BUSY, IDLE
 from tiempo import TIEMPO_REGISTRY, all_runners
 from tiempo.conn import REDIS
 from tiempo.utils import utc_now, task_time_keys
+from tiempo.work import announce_tasks_to_client
 
 
 logger = Logger()
+
+default_report_handler = None
 
 
 def run():
@@ -54,7 +57,7 @@ def run():
                 )
 
                 # OK, we're ready to queue up a new job for this task!
-                task.spawn_job()
+                task.spawn_job(default_report_handler=default_report_handler)
 
 
 looper = task.LoopingCall(run)
@@ -65,5 +68,6 @@ def start():
 
     if not looper.running:
         looper.start(1) #INTERVAL)
+        task.LoopingCall(announce_tasks_to_client).start(5)
     else:
         logger.warning("Tried to call tiempo_loop start() while the loop is already running.")

@@ -78,7 +78,7 @@
                     </div>
 
                     <!-- Queue -->
-                    <div ng-if="tiempo.jobs">
+                    <div ng-if="tiempo.jobs | jobsFilter">
                         <h2>Job Queue</h2>
 
                         <md-list-item>
@@ -86,7 +86,7 @@
                                 <div flex='10'>Name</div>
                                 <div flex='40'>Task Path</div>
                                 <div flex='20'>Enqueued</div>
-                                <div flex='20'>Status</div>
+                                <div flex='20'>Group</div>
                             </div>
                         </md-list-item>
 
@@ -99,7 +99,7 @@
                                     <div flex='20'>
                                         <span am-time-ago="job.enqueued"</span>
                                     </div>
-                                    <div flex='20'>[{job.status}]</div>
+                                    <div flex='20'>[{job.group}]</div>
                                 </div>
                             </md-list-item>
                         </div>

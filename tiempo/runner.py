@@ -91,9 +91,16 @@ class Runner(object):
         '''
         Run the current job's task.
         '''
-        logger.debug('%s running task: %s' % (self, self.current_job.code_word))
-        self.announce('runners', alert=True)
-        self.current_job.start()
+        try:
+            logger.debug('%s running task: %s' % (self, self.current_job.code_word))
+            self.announce('runners', alert=True)
+            self.current_job.start()
+        except AttributeError, e:
+            if not getattr(self, "current_job", None):
+                raise ValueError("A Runner cannot run without a current_job.")
+            else:
+                raise
+
         task = self.current_job.task
 
         return task.run()
