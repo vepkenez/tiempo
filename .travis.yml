@@ -1,7 +1,4 @@
 language: python
-env:
-- TOXENV=py27
-- TOXENV=pypy
 install:
 - pip install tox
 services:
