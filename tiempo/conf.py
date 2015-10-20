@@ -1,5 +1,6 @@
 from logging import getLogger
 import os
+from tiempo import LEAVE_DJANGO_UNSET
 
 logger = getLogger(__name__)
 
@@ -13,7 +14,7 @@ except (ImportError, Exception), e:
 import json
 
 
-if has_django:
+if has_django and not LEAVE_DJANGO_UNSET:
     INTERVAL = getattr(settings, 'TIEMPO_INTERVAL', 5)
     THREAD_CONFIG = getattr(settings, 'TIEMPO_THREAD_CONFIG', [('1','2','3'),('1','2'),('1',)])
     RESULT_LIFESPAN = getattr(settings, 'TIEMPO_RESULT_LIFESPAN_DAYS', 1)

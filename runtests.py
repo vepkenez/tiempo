@@ -1,6 +1,8 @@
 #! python
 
 import os, sys
+import tiempo
+tiempo.LEAVE_DJANGO_UNSET = True
 
 # begin chdir armor
 sys.path[:] = map(os.path.abspath, sys.path)

@@ -15,5 +15,6 @@ def all_runners():
 REDIS_GROUP_NAMESPACE = 'tiempogroup'
 RECENT_KEY = 'tiempo:recent_tasks'
 RESULT_PREFIX = 'tiempo:task_result'
+LEAVE_DJANGO_UNSET = False  # Don't use django settings during loop start.
 
 __version__ = "1.1.8"
