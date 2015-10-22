@@ -1,11 +1,12 @@
-from tiempo.work import Task
+from tiempo.work import Trabajo
 import random
 import time
 
-@Task(periodic=True, force_interval=5)
+
+@Trabajo(periodic=True, force_interval=4)
 def llama():
-    number = random.choice(range(5, 11))
+    number = random.choice(range(5, 12))
     time.sleep(number)
-    if number in [5, 6, 7, 8, 9, 10]:
+    if number in [5, 7, 9, 11]:
         raise RuntimeError("I am error.  Friend of bagu.")
     return

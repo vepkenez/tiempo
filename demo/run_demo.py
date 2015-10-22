@@ -35,15 +35,18 @@ settings.configure(
         'tiempo_web',
         'django.contrib.auth',
         'django.contrib.contenttypes',
+        'django.contrib.staticfiles',
         ],
-    SECRET_KEY = "LLAMAS",
+    SECRET_KEY="LLAMAS",
 
-    DATABASES = {
+    DATABASES={
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
         }
     },
+    STATIC_URL='/static/',
+    TIEMPO_THREAD_CONFIG=[('1', '2', '3'), ('1',)]
 )
 
 
