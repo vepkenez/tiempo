@@ -1,4 +1,4 @@
-import os
+import os, sys
 
 from hendrix.deploy.base import HendrixDeploy
 from django.conf import settings
@@ -6,9 +6,16 @@ from hendrix.facilities.resources import NamedResource
 from twisted.internet.protocol import Factory
 from txsockjs.factory import SockJSResource
 
-from tiempo.resource import TiempoMessageProtocol
+
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+
+# begin chdir armor
+sys.path[:] = map(os.path.abspath, sys.path)
+# end chdir armor
+
+sys.path.insert(0, os.path.dirname(os.getcwd()))
+from tiempo.resource import TiempoMessageProtocol
 
 from twisted.logger import (
     ILogObserver, LogLevel, globalLogPublisher, formatEvent, FilteringLogObserver, LogLevelFilterPredicate
@@ -32,7 +39,7 @@ settings.configure(
     INSTALLED_APPS=[
         'tiempo',
         'tiempo.contrib.django',
-        'demo.tiempo_web',
+        'tiempo_web',
         'django.contrib.auth',
         'django.contrib.contenttypes',
         'django.contrib.staticfiles',
