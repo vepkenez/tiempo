@@ -15,6 +15,7 @@ sys.path[:] = map(os.path.abspath, sys.path)
 # end chdir armor
 
 sys.path.insert(0, os.path.dirname(os.getcwd()))
+print sys.path
 from tiempo.resource import TiempoMessageProtocol
 
 from twisted.logger import (
