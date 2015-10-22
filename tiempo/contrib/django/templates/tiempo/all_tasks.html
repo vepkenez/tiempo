@@ -1,3 +1,5 @@
+{% load staticfiles %}
+
 <!DOCTYPE html>
 <html>
     <head>
@@ -5,81 +7,106 @@
         <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.css">
 
         <style type="text/css">
+
             .job.ng-animate {
-                background-color: teal;
+              background-color: teal;
             }
 
-            #errorContainer {
+            #finishedJobs {
               position: absolute;
               right: 0;
             }
+
             .error {
               border: 2px solid red;
               margin-top: 10px;
               background-color: rgb(255, 233, 233);
             }
 
-            .errorText {
-              font-size:25px;
+             .success {
+              border: 2px solid green;
+              margin-top: 10px;
+              background-color: #D5FFD1;
+            }
+
+            md-progress-circular {
+              height: 20px;
+              position: relative;
+              bottom: 10px;
             }
 
             #kioskRowAreas {
-            width:60%;
+              width:60%;
+            }
+
+            #organizationLogo {
+                width: 180px;
+            }
+             .md-toolbar-tools {
+              background-color: #f6f6f6;
+              border-bottom: 1px solid #ccc;
+              height:100px;
             }
 
 
         </style>
-
     </head>
     <body ng-app='app'>
         <md-toolbar>
             <div class='md-toolbar-tools'>
-                <h1>Reelio - Tiempo</h1>
+                <img id="organizationLogo" src="{{organization_logo}}"/>
+                <img src="{% static 'tiempo/img/tiempo-logo.png' %}" width="100" style="float: right;"/>
             </div>
         </md-toolbar>
 
         <div ng-controller='TiempoController' layout-padding>
-            <div id="errorContainer">
-                <div ng-repeat="error in tiempo.errors" class="error">
-                    <h4>Error in job "[{error.codeWord}]"</h4>
-                    <div>Path: [{error.message}]</div>
-                    <div>Uid: [{error.jobUid}])</div>
-                    <div class="errorText">[{error.error_message}]</div>
+
+            <md-list id="finishedJobs">
+                <div class="finishedJob" ng-repeat="(id, result) in tiempo.finished_runners | reverse |limitTo: 10" >
+                    <div ng-class="{'error': result.error_message, 'success': !result.error_message}" class="md-list-item-text" layout="column">
+                        <div flex="10">"[{result.codeWord}]" <strong>([{result.message}])</strong></div>
+                        <div><span am-time-ago="result.finish_time"></span></div>
+                        <div class="errorText">[{result.error_message}]</div>
+                    </div>
                 </div>
-            </div>
+            </md-list>
 
             <div layout='row' id="kioskRowAreas">
-                <md-list flex='100' class='md-whiteframe-1dp'>
+                <md-list flex='100' offset="5" class='md-whiteframe-z1'>
 
                     <!-- Runners -->
-
-                    <md-list-item>
+                    <h2 layout-padding>Running</h2>
+                    <md-list-item layout-padding>
                         <div flex='100' layout='row' layout-align='space-around center'>
+                            <!--<div flex='10'></div>-->
                             <div flex='10'>Runner</div>
                             <div flex='20'>Job Code Name</div>
-                            <div flex='30'>Time</div>
+                            <div flex='20'>Time</div>
                             <div flex='40'>Activity</div>
                         </div>
                     </md-list-item>
 
-
                     <div ng-repeat='(id, runner) in tiempo.runners'>
-                        <md-divider></md-divider>
+
                         <md-list-item running-alert="runner.jobUid" error-state="runner.error">
                             <div flex='100'layout='row' layout-align='space-around center'>
+                                <div flex="10">
+                                    <md-progress-circular md-diameter="20px" md-mode="indeterminate"></md-progress-circular>
+                                </div>
                                 <div flex='10'>[{id}]</div>
                                 <div flex='20'>[{runner.codeWord}]</div>
-                                <div flex='30'>
-                                    <span am-time-ago="runner.time"></span>
+                                <div flex='20'>
+                                    <span am-time-ago="runner.start_time"></span>
                                 </div>
                                 <div flex='40'>[{runner.message}]</div>
                             </div>
                         </md-list-item>
+                        <md-divider></md-divider>
                     </div>
 
                     <!-- Queue -->
-                    <div ng-if="tiempo.jobs | jobsFilter">
-                        <h2>Job Queue</h2>
+                    <div>
+                        <h2 layout-padding>Job Queue</h2>
 
                         <md-list-item>
                             <div flex='100' layout='row' layout-align='space-around center'>
@@ -106,7 +133,7 @@
                     </div>
 
                     <!-- Tasks -->
-                    <h2>Tasks</h2>
+                    <h2 layout-padding>Tasks</h2>
 
                     <md-list-item>
                         <div flex='100' layout='row' layout-align='space-around center'>
@@ -148,13 +175,15 @@
 
         <script type="text/javascript">
 
-            var tiempoKiosk = angular.module('app', [
+            angular.module('app', [
                 'ngAnimate',
                 'ngMaterial',
                 'TiempoController',
                 'CustomInterpolation',
                 'angularMoment',
                 'tiempoFilters',
+                'runningAlert',
+                'jobAnimations',
             ]);
 
             angular.module('CustomInterpolation', [])
@@ -169,13 +198,23 @@
                     if (!input) return input;
                     var result = {};
                     angular.forEach(input, function(value, key) {
-                        if (value.status == "queued") {
+                        if (value.status == "queued" || value.status == "running") {
                             result[key] = value;
                         }
                     });
                     return result;
                   }
+                })
+               .filter('reverse', function() {
+                  return function(items) {
+                    arr = [];
+                    angular.forEach(items, function(value, key) {
+                        arr.push(value);
+                    });
+                    return arr.slice().reverse();
+                  };
                 });
+
 
             angular.module('TiempoController', [])
             .controller('TiempoController', function($scope){
@@ -196,6 +235,9 @@
                     );
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'errors'})
+                    );
+                    sock.send(
+                        JSON.stringify({'hx_subscribe': 'successes'})
                     );
                     sock.send('updateJobs');
                 };
@@ -235,7 +277,7 @@
 
             });
 
-            tiempoKiosk.directive('runningAlert', function($animate) {
+            angular.module('runningAlert', []).directive('runningAlert', function($animate) {
               return function(scope, runnerElem, attr) {
                   scope.$watch(attr.errorState, function(nv, ov) {
                     if (nv) {
@@ -253,17 +295,16 @@
                             alertRunningSequence = [
                                 { e: jobElem, p: {'backgroundColor': '#FF9900'}},
                                 { e: taskElem, p: "alertRunning", o: { sequenceQueue: false}},
-                                { e: jobElem, p: 'transition.slideUpOut', o: { sequenceQueue: false}},
+                                { e: jobElem, p: 'transition.slideLeftBigOut', o: { sequenceQueue: false}},
                                 { e: runnerElem, p: {'backgroundColor': '#FF9900'}, o: { sequenceQueue: false}},
-                                { e: runnerElem, p: 'transition.slideUpIn', o: { sequenceQueue: false}},
+                                { e: runnerElem, p: 'transition.slideLeftBigIn', o: { sequenceQueue: false}},
                                 { e: runnerElem, p: {'backgroundColor': '#fff'}, o: { sequenceQueue: false}},
-
                             ]
                         }
                     } else {
                         console.log("Job finished.");
                         alertRunningSequence = [
-                        { e: runnerElem, p: 'transition.slideDownOut'},
+                        { e: runnerElem, p: 'transition.slideUpOut'},
                         ]
 
                     }
@@ -274,22 +315,21 @@
               }
             });
 
-            tiempoKiosk.animation('.job', [function() {
+            angular.module('jobAnimations', []).animation('.job', [function() {
                   return {
                     enter: function(element, doneFn) {
                         Velocity(element, "transition.flipBounceYIn");
                         Velocity(element, {backgroundColor: "#fff"}, {duration: 2000}).then(doneFn);
                     },
                   }
-            }]);
-            tiempoKiosk.animation('.error', [function() {
+            }])
+            .animation('.finishedJob', [function() {
                   return {
                     enter: function(element, doneFn) {
                         Velocity(element, "transition.slideLeftBigIn");
                     },
                   }
             }]);
-
 
 
     Velocity.RegisterEffect("alertRunning", {

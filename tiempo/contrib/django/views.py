@@ -6,6 +6,7 @@ from tiempo import conf as tiemposettings
 from tiempo import TIEMPO_REGISTRY
 
 from django.contrib.auth.decorators import login_required
+from django.views.generic import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse
 
@@ -16,6 +17,15 @@ import dateutil.parser
 utc = pytz.timezone('UTC')
 local = pytz.timezone("America/New_York")
 
+
+class TiempoKiosk(TemplateView):
+    template_name = 'tiempo/all_tasks.html'
+    organization_logo = None
+
+    def get_context_data(self, **kwargs):
+        context = super(TiempoKiosk, self).get_context_data(**kwargs)
+        context['organization_logo'] = self.organization_logo
+        return context
 
 
 def dashboard(request):
@@ -40,9 +50,6 @@ def dashboard(request):
     return response
 
 
-def all_tasks(request):
-    response = render(request, 'tiempo/all_tasks.html')
-    return response
 
 
 @login_required

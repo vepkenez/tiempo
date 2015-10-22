@@ -41,24 +41,7 @@ class CaptureStdOut(list):
         self.extend(self._stringio.getvalue().splitlines())
         sys.stdout = self._stdout
 
-    def finished(self, timestamp=None):
-        if DEBUG:
-            pass
-            # return
 
-        self.timestamp = timestamp
-        if not timestamp:
-            self.timestamp = utc_now()
-
-        task_key = '%s:%s' % (self.task.key, self.task.uid)
-        expire_time = int(((self.timestamp + relativedelta(
-            days=RESULT_LIFESPAN)) - self.timestamp).total_seconds())
-
-        pipe = REDIS.pipeline()
-        pipe.zadd(RECENT_KEY, self.start_time.strftime('%s'), task_key)
-        pipe.set(self.task.uid, self.format_output())
-        pipe.expire(self.task.uid, expire_time)
-        pipe.execute()
 
     def format_output(self):
 

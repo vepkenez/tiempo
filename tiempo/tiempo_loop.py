@@ -2,7 +2,6 @@ import datetime
 
 from twisted.internet import task
 from twisted.logger import Logger
-from twisted.internet import reactor
 
 from constants import BUSY, IDLE
 from tiempo import TIEMPO_REGISTRY, all_runners
@@ -16,7 +15,7 @@ logger = Logger()
 default_report_handler = None
 
 
-def run():
+def cycle():
     this_loop_runtime = utc_now()
 
     # This loop basically does two things:
@@ -29,7 +28,7 @@ def run():
         if not result in (BUSY, IDLE):
             # If the runner is neither busy nor idle, it will have returned a Deferred.
             # We add our paths for success and failure here.
-            result.addCallbacks(runner.finish_job, runner.handle_error)
+            result.addCallbacks(runner.handle_success, runner.handle_error)
 
         runner.announce('runners')  # The runner may have changed state; announce it.
 
@@ -60,7 +59,7 @@ def run():
                 task.spawn_job(default_report_handler=default_report_handler)
 
 
-looper = task.LoopingCall(run)
+looper = task.LoopingCall(cycle)
 
 
 def start():

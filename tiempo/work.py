@@ -1,4 +1,6 @@
-from tiempo import RUNNERS
+from dateutil.relativedelta import relativedelta
+from tiempo import RUNNERS, RECENT_KEY
+from tiempo.conf import RESULT_LIFESPAN
 from tiempo.utils import utc_now, namespace, task_time_keys
 from hendrix.contrib.async.messaging import hxdispatcher
 from twisted.internet import task
@@ -55,11 +57,12 @@ class Job(object):
             self.uid = reconstitute_from['uid']
             self.code_word = reconstitute_from['codeWord']
             self.status = 'queued'
+            self.enqueued = reconstitute_from['enqueued']
         else:
             self.uid = str(uuid.uuid4())
             self.code_word = task.code_word
             self.status = 'waiting'
-        self.enqueued = False
+            self.enqueued = False
 
     def __str__(self):
         return "Job: %s / %s - (Task: %s, %s)" % (
@@ -79,89 +82,6 @@ class Job(object):
              'group': self.task.group,  # TODO: Maybe do this client side.
              }
         return d
-
-    def soon(self, *args, **kwargs):
-        """
-        schedules this task to be run with the args and kwargs
-        whenever a worker participating in this task's groups
-        comes up as available
-        """
-
-        queue_name = kwargs.pop('tiempo_wait_for', None)
-
-        if queue_name:
-            queue_name = namespace(queue_name)
-        else:
-            queue_name = self.task.group_key
-
-        self._freeze(*args, **kwargs)
-        self._enqueue(queue_name)
-        return self
-
-    def now(self, *args, **kwargs):
-        """
-        runs this task NOW with the args and kwargs
-        """
-        self._freeze(*args, **kwargs)
-        self._thaw()
-        return self.run()
-
-    def finish(self, error=None):
-        try:
-            logger.debug('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
-        except AttributeError, e:
-            # Somehow this job finished without ever being started.
-            raise
-
-        self._enqueue_dependents()
-
-        now = utc_now()
-
-        data = {
-            'key': self.task.key,
-            'uid': self.uid,
-            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
-            'finished': now.strftime('%y/%m/%d %I:%M%p'),
-            'elapsed': (now - self.start_time).seconds,
-            'errors': 'with errors: %s' % error if error else ''
-        }
-
-        data['text'] =  """
-            %(key)s:
-            started at %(start)s
-            finished in %(elapsed)s seconds
-            %(errors)s""" % data
-
-        REDIS.set('tiempo_last_finished_%s' % self.task.group_key, json.dumps(data))
-
-        self.status = 'finished'
-        self.announce('job_queue')
-
-    def start(self, error=None):
-
-        self.start_time = utc_now()
-
-        logger.debug('Starting %s' % self.code_word)
-
-        data = {
-            'key': self.task.key,
-            'uid':self.uid,
-            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
-        }
-
-        data['text'] =  """
-%(key)s:
-starting at %(start)s"""%data
-
-        REDIS.set('tiempo_last_started_%s' % self.task.group_key, json.dumps(data))
-
-        self.status = "running"
-        self.announce('job_queue')
-
-    def announce(self, channel):
-        hxdispatcher.send(channel, {'jobs':
-                                        {self.uid: self.serialize_to_dict()}
-                                    })
 
     def _freeze(self, *args, **kwargs):
 
@@ -195,6 +115,7 @@ starting at %(start)s"""%data
 
         # Announce that job is queued.
         self.enqueued = utc_now().isoformat()
+        self.data['enqueued'] = self.enqueued  # TODO: Conventionalize serialization.
         self.status = "queued"
         self.announce('job_queue')
 
@@ -225,6 +146,100 @@ starting at %(start)s"""%data
     @staticmethod
     def _decode(data):
         return json.loads(data)
+
+    def soon(self, *args, **kwargs):
+        """
+        schedules this task to be run with the args and kwargs
+        whenever a worker participating in this task's groups
+        comes up as available
+        """
+
+        queue_name = kwargs.pop('tiempo_wait_for', None)
+
+        if queue_name:
+            queue_name = namespace(queue_name)
+        else:
+            queue_name = self.task.group_key
+
+        self._freeze(*args, **kwargs)
+        self._enqueue(queue_name)
+        return self
+
+    def now(self, *args, **kwargs):
+        """
+        runs this task NOW with the args and kwargs
+        """
+        self._freeze(*args, **kwargs)
+        self._thaw()
+        return self.run()
+
+    def announce(self, channel):
+        hxdispatcher.send(channel, {'jobs':
+                                        {self.uid: self.serialize_to_dict()}
+                                    })
+
+    def start(self, error=None):
+
+        self.start_time = utc_now()
+
+        logger.debug('Starting %s' % self.code_word)
+
+        data = {
+            'key': self.task.key,
+            'uid':self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+        }
+
+        data['text'] =  """
+%(key)s:
+starting at %(start)s"""%data
+
+        REDIS.set('tiempo_last_started_%s' % self.task.group_key, json.dumps(data))
+
+        self.status = "running"
+        self.announce('job_queue')
+
+    def finish(self, error=None):
+        try:
+            logger.info('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
+        except AttributeError, e:
+            # Somehow this job finished without ever being started.
+            raise
+
+        self._enqueue_dependents()
+
+        now = utc_now()
+
+        task_key = '%s:%s' % (self.task.key, self.uid)
+        expire_time = int(((self.start_time + relativedelta(
+            days=RESULT_LIFESPAN)) - self.start_time).total_seconds())
+
+        pipe = REDIS.pipeline()
+        pipe.zadd(RECENT_KEY, self.start_time.strftime('%s'), task_key)
+        pipe.set(self.uid, self.serialize_to_dict())
+        pipe.expire(self.uid, expire_time)
+        pipe.execute()
+        ### From old CaptureStdOut.finished()
+
+        data = {
+            'key': self.task.key,
+            'uid': self.uid,
+            'start': self.start_time.strftime('%y/%m/%d %I:%M%p'),
+            'finished': now.strftime('%y/%m/%d %I:%M%p'),
+            'elapsed': (now - self.start_time).seconds,
+            'errors': 'with errors: %s' % error if error else ''
+        }
+
+        data['text'] =  """
+            %(key)s:
+            started at %(start)s
+            finished in %(elapsed)s seconds
+            %(errors)s""" % data
+
+        REDIS.set('tiempo_last_finished_%s' % self.task.group_key, json.dumps(data))
+
+        self.status = 'finished'
+        self.announce('job_queue')
 
     @staticmethod
     def rehydrate(byte_string):

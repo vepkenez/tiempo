@@ -21,6 +21,9 @@ class Runner(object):
     During tiempo_loop, each runner is given a chance to run a job in the queue.
     '''
 
+    start_time = None
+    finish_time = None
+
     def __init__(self, number, thread_group_list):
         logger.info("Starting Runner %s for groups %s (%s)" % (number, thread_group_list, id(self)))
         for i in thread_group_list:
@@ -91,6 +94,7 @@ class Runner(object):
         '''
         Run the current job's task.
         '''
+        self.start_time = utc_now()
         try:
             logger.debug('%s running task: %s' % (self, self.current_job.code_word))
             self.announce('runners', alert=True)
@@ -106,19 +110,30 @@ class Runner(object):
         return task.run()
 
     def finish_job(self, result):
-        self.action_time = utc_now()
         self.current_job.finish()
-        self.current_job = None
-        self.announce('runners')
+
+        self.current_job = self.start_time = self.finish_time = None
+
+        self.announce('runners')  # Announce that the runner is back to idle.
         self.error_state = False
         return  # And go back to cycling.
 
+    def handle_success(self, return_value):
+        self.finish_time = utc_now()
+        runner_dict = self.serialize_to_dict()
+        runner_dict.update({'return_value': str(return_value)})
+        hxdispatcher.send('successes', {'finished_runners': {self.current_job.uid: runner_dict}})
+        REDIS.hset('successes', self.current_job.uid, json.dumps(runner_dict))
+        return self.finish_job(return_value)
+
     def handle_error(self, failure):
+        self.finish_time = utc_now()
         self.error_state = True
         logger.error(failure.value)
-        d = self.serialize_to_dict()
-        d.update({'error_message': str(failure.value)})
-        hxdispatcher.send('errors', {'errors': {self.current_job.uid: d}})
+        runner_dict = self.serialize_to_dict()
+        runner_dict.update({'error_message': str(failure.value)})
+        hxdispatcher.send('errors', {'finished_runners': {self.current_job.uid: runner_dict}})
+        REDIS.hset('errors', self.current_job.uid, json.dumps(runner_dict))
         return self.finish_job(failure)
 
     def serialize_to_dict(self, alert=False):
@@ -136,12 +151,18 @@ class Runner(object):
         d = {
             'runner': self.number,
             'codeWord': code_word,
-            'time': self.action_time.isoformat(),
+            'message_time': self.action_time.isoformat(),
             'message': message,
             'jobUid': job_uid,
             'alert': alert,
             'error': self.error_state,
         }
+
+        if self.start_time:
+            d['start_time'] = self.start_time.isoformat()
+        if self.finish_time:
+            d['finish_time'] = self.finish_time.isoformat()
+
         return d
 
     def announce(self, channel, alert=False):

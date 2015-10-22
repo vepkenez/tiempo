@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from .contrib.django.utils import six
 
 from tiempo.conf import TASK_PATHS
@@ -135,7 +136,7 @@ def all_jobs(groups):
     '''
     Find all Jobs in the list of groups, return them as a dict.
     '''
-    jobs_dict = {}
+    jobs_dict = OrderedDict()
     for group in groups:
         name = namespace(group)
         jobs_dict[group] = REDIS.lrange(name, 0, -1)
