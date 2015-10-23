@@ -37,6 +37,7 @@ class Runner(object):
         self.task_groups = thread_group_list
         self.number = number
         self.error_state = False
+        self.announcer = None
 
     def __repr__(self):
         return 'Tiempo Runner %d' % self.number
@@ -106,8 +107,9 @@ class Runner(object):
                 raise
 
         task = self.current_job.task
+        self.announcer = task.announcer
 
-        return task.run()
+        return task.run(runner=self)
 
     def finish_job(self, result):
         self.current_job.finish()
@@ -122,17 +124,18 @@ class Runner(object):
         self.finish_time = utc_now()
         runner_dict = self.serialize_to_dict()
         runner_dict.update({'return_value': str(return_value)})
-        hxdispatcher.send('successes', {'finished_runners': {self.current_job.uid: runner_dict}})
+        hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
         REDIS.hset('successes', self.current_job.uid, json.dumps(runner_dict))
         return self.finish_job(return_value)
 
     def handle_error(self, failure):
         self.finish_time = utc_now()
         self.error_state = True
-        logger.error(failure.value)
+        logger.info(failure.getBriefTraceback())  # TODO: What level do we want this to be?
         runner_dict = self.serialize_to_dict()
-        runner_dict.update({'error_message': str(failure.value)})
-        hxdispatcher.send('errors', {'finished_runners': {self.current_job.uid: runner_dict}})
+        runner_dict.update({'result': str(failure.value)})
+        runner_dict.update({'result_detail': str(failure.getTraceback())})
+        hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
         REDIS.hset('errors', self.current_job.uid, json.dumps(runner_dict))
         return self.finish_job(failure)
 
@@ -162,6 +165,12 @@ class Runner(object):
             d['start_time'] = self.start_time.isoformat()
         if self.finish_time:
             d['finish_time'] = self.finish_time.isoformat()
+
+        if self.announcer:
+            if self.announcer.progress_increments:
+                progress_percentage = (float(self.announcer.progress) / float(self.announcer.progress_increments)) * 100
+                d['total_progress'] = progress_percentage
+                logger.info("Reporting Progress for %s as %s" % (self, progress_percentage))
 
         return d
 

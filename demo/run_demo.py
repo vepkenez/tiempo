@@ -6,8 +6,6 @@ from hendrix.facilities.resources import NamedResource
 from twisted.internet.protocol import Factory
 from txsockjs.factory import SockJSResource
 
-
-
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # begin chdir armor

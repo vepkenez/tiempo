@@ -1,5 +1,6 @@
 from dateutil.relativedelta import relativedelta
 from tiempo import RUNNERS, RECENT_KEY
+from tiempo.announce import Announcer
 from tiempo.conf import RESULT_LIFESPAN
 from tiempo.utils import utc_now, namespace, task_time_keys
 from hendrix.contrib.async.messaging import hxdispatcher
@@ -266,9 +267,14 @@ class Trabajo(object):
     def __repr__(self):
         return self.key
 
-    def __init__(self, report_to=None, *args, **kwargs):
+    def __init__(self, report_to=None, announcer_name=None, *args, **kwargs):
 
         self.report_handler = report_to
+
+        self.announcer_name = announcer_name
+
+        self.announcer = Announcer()
+
         self.day = None
         self.hour = None
         self.minute = None
@@ -340,16 +346,24 @@ class Trabajo(object):
         }
         return task_as_dict
 
-    def run(self):
+    def run(self, runner=None):
         """
         run right now
         """
 
         func = self._get_function()
+        kwargs = getattr(self, 'kwargs_to_function', {})
+
+        if self.announcer_name:
+            kwargs[self.announcer_name] = self.announcer
+
+            if runner:
+                self.announcer.runner = runner
+
         result = func(
-            *getattr(self, 'args_to_function', ()),
-            **getattr(self, 'kwargs_to_function', {})
-        )
+                *getattr(self, 'args_to_function', ()),
+                **kwargs
+                )
         return result
 
     def _thaw(self, data=None):

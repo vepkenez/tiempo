@@ -28,6 +28,10 @@ class TiempoKiosk(TemplateView):
         return context
 
 
+class TiempoHistory(TemplateView):
+    template_name = 'tiempo/history.html'
+
+
 def dashboard(request):
 
     threads = tiemposettings.THREAD_CONFIG
