@@ -31,12 +31,12 @@ class ResultsBroadCastTests(TestCase):
                 q.put(new_value)
 
         listen_loop = task.LoopingCall(listen_for_event)
-        listen_loop.start(.5)
+        listen_loop.start(.2)
 
         def set_value_and_assert():
             try:
                 REDIS.set('results:whatever', 'a large farva')
-                new_value = q.get(True, 1)
+                new_value = q.get(True, 1.5)
             except Empty:
                 self.fail("Key did not have expected value set.")
             else:
