@@ -64,7 +64,7 @@
         <div ng-controller='TiempoController' layout-padding>
 
             <md-list id="finishedJobs" class='md-whiteframe-z1'>
-                <div class="finishedJob" ng-repeat="(id, result) in tiempo.finished_runners | reverse |limitTo: 10" >
+                <div class="finishedJob" ng-repeat="(id, result) in tiempo.results | reverse |limitTo: 10" >
                     <div ng-class="{'error': result.error_message, 'success': !result.error_message}" class="md-list-item-text" layout="column">
                         <div flex="10">"[{result.codeWord}]" <strong>([{result.message}])</strong></div>
                         <div><span am-time-ago="result.finish_time"></span></div>
@@ -235,10 +235,7 @@
                         JSON.stringify({'hx_subscribe': 'job_queue'})
                     );
                     sock.send(
-                        JSON.stringify({'hx_subscribe': 'runners'})
-                    );
-                    sock.send(
-                        JSON.stringify({'hx_subscribe': 'errors'})
+                        JSON.stringify({'hx_subscribe': 'results'})
                     );
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'successes'})
@@ -262,8 +259,8 @@
 
                     var key = Object.keys(message); // Will be "runners" or "tasks" or something.
                     var objects = message[key]
-                    // console.log("Received " + Object.keys(objects).length + " " + key);
-                    // console.log(objects);
+                    console.log("Received " + Object.keys(objects).length + " " + key);
+                    console.log(objects);
 
                     // Make sure we know about this type of object.
                     if (!(key in $scope.tiempo)) {

@@ -25,8 +25,6 @@ class TiempoMessageProtocol(MessageHandlerProtocol):
 
             # All completed jobs. # TODO: Move these things to their own place.
             all_completed = completed_jobs()
-            hxdispatcher.send('history', {'finished_runners': all_completed})
-
-
+            hxdispatcher.send('results', {'results': all_completed})
         else:
             return MessageHandlerProtocol.dataReceived(self, data)

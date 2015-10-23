@@ -1,18 +1,16 @@
-
 from datetime import datetime
-from tiempo.execution import REDIS, RECENT_KEY
-
-from tiempo import conf as tiemposettings
-from tiempo import TIEMPO_REGISTRY
+import json
 
 from django.contrib.auth.decorators import login_required
 from django.views.generic import TemplateView
 from django.shortcuts import render
 from django.http import HttpResponse
-
 import pytz
-import json
 import dateutil.parser
+
+from tiempo import conf as tiemposettings, RECENT_KEY
+from tiempo.conn import REDIS
+
 
 utc = pytz.timezone('UTC')
 local = pytz.timezone("America/New_York")

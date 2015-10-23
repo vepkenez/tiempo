@@ -23,6 +23,7 @@ if has_django and not LEAVE_DJANGO_UNSET:
     REDIS_HOST = getattr(settings,'REDIS_HOST', None) or 'localhost'
     REDIS_PORT = getattr(settings, 'REDIS_PORT', None) or '6379'
     REDIS_QUEUE_DB = getattr(settings, 'REDIS_QUEUE_DB', None) or 7
+    REDIS_TEST_DB = getattr(settings, 'REDIS_QUEUE_DB', None) or 13
     REDIS_PW = getattr(settings, 'REDIS_PW', None)
 else:
     INTERVAL = os.environ.get('TIEMPO_INTERVAL', 1)
@@ -33,6 +34,7 @@ else:
     REDIS_HOST = os.environ.get('TIEMPO_REDIS_HOST', 'localhost')
     REDIS_PORT = os.environ.get('TIEMPO_REDIS_PORT', 6379)
     REDIS_QUEUE_DB = os.environ.get('TIEMPO_REDIS_QUEUE_DB', 12)
+    REDIS_TEST_DB = os.environ.get('TIEMPO_REDIS_TEST_DB', 13)
     REDIS_PW = os.environ.get('TIEMPO_REDIS_PW', None)
 
 TASK_PATHS = json.loads(os.environ.get('TIEMPO_TASK_PATHS', '["tiempo.demo"]'))

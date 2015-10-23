@@ -1,18 +1,18 @@
 import datetime
+from hendrix.contrib.async.messaging import hxdispatcher
 
 from twisted.internet import task
 from twisted.logger import Logger
 
 from constants import BUSY, IDLE
 from tiempo import TIEMPO_REGISTRY, all_runners
-from tiempo.conn import REDIS
+from tiempo.conn import REDIS, subscribe_to_backend_notifications, hear_from_backend
 from tiempo.utils import utc_now, task_time_keys
 from tiempo.work import announce_tasks_to_client
 
-
 logger = Logger()
-
 default_report_handler = None
+ps = REDIS.pubsub()
 
 
 def cycle():
@@ -58,11 +58,25 @@ def cycle():
                 # OK, we're ready to queue up a new job for this task!
                 task.spawn_job(default_report_handler=default_report_handler)
 
+    events = hear_from_backend()
+    if events:
+        for event in events:
+            if not event['type'] == 'psubscribe':
+                key = event['channel'].split(':', 1)[1]
+                new_value = REDIS.hgetall(key)
+                channel_to_announce = key.split(':', 1)[0]
+                if new_value.has_key('jobUid'):
+                    hxdispatcher.send(channel_to_announce, {channel_to_announce: {new_value['jobUid']: new_value}})
+                else:
+                    hxdispatcher.send(channel_to_announce, {channel_to_announce: new_value})
 
 looper = task.LoopingCall(cycle)
 
 
 def start():
+
+    subscribe_to_backend_notifications()
+
     logger.info("tiempo_loop start() called.")
 
     if not looper.running:
