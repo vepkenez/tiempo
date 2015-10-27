@@ -5,6 +5,17 @@ from tiempo.conn import REDIS, hear_from_backend, subscribe_to_backend_notificat
 
 class EventsBroadCastTests(TestCase):
 
+    def test_subscribing_causes_notifications(self):
+        REDIS.flushall()
+        REDIS.config_set('notify-keyspace-events', '')
+        REDIS.config_get('notify-keyspace-events')
+        # Notifications are now turned off.
+
+        # However, subscribing turns them back on.
+        subscribe_to_backend_notifications()
+        config = REDIS.config_get('notify-keyspace-events')
+        self.assertEqual(config['notify-keyspace-events'], 'AKE')
+
     def test_subscribe_notice(self):
         REDIS.flushall()
         subscribe_to_backend_notifications()
@@ -18,7 +29,10 @@ class EventsBroadCastTests(TestCase):
 
         REDIS.set('results:whatever', 'a large farva')
 
-        set_event = hear_from_backend()[1]
+        try:
+            set_event = hear_from_backend()[1]
+        except IndexError:
+            self.fail("Didn't get more than one item from the backend.  Did you remember to enable the proper notifications?")
         key = set_event['channel'].split(':', 1)[1]
         new_value = REDIS.get(key)
 
