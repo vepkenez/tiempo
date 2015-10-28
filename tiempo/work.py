@@ -59,6 +59,8 @@ class Job(object):
             self.code_word = reconstitute_from['codeWord']
             self.status = 'queued'
             self.enqueued = reconstitute_from['enqueued']
+            self.args_to_function = reconstitute_from['args_to_function']
+            self.kwargs_to_function = reconstitute_from['kwargs_to_function']
         else:
             self.uid = str(uuid.uuid4())
             self.code_word = task.code_word
@@ -130,9 +132,7 @@ class Job(object):
 
         obj = REDIS.lpop(self.task.waitfor_key)
         if obj:
-            awaiting_task = Trabajo.rehydrate(obj)
-
-            print 'enqueing:', awaiting_task,'uid',awaiting_task.uid, 'with waitfor:', self.waitfor_key
+            awaiting_task = Job.rehydrate(obj)
 
             awaiting_task.soon(
                 *getattr(awaiting_task, 'args_to_function', ()),
@@ -148,19 +148,14 @@ class Job(object):
     def _decode(data):
         return json.loads(data)
 
-    def soon(self, *args, **kwargs):
+    def soon(self, job_list=None, *args, **kwargs):
         """
         schedules this task to be run with the args and kwargs
         whenever a worker participating in this task's groups
         comes up as available
         """
 
-        queue_name = kwargs.pop('tiempo_wait_for', None)
-
-        if queue_name:
-            queue_name = namespace(queue_name)
-        else:
-            queue_name = self.task.group_key
+        queue_name = job_list or self.task.group_key
 
         self._freeze(*args, **kwargs)
         self._enqueue(queue_name)
@@ -170,9 +165,14 @@ class Job(object):
         """
         runs this task NOW with the args and kwargs
         """
-        self._freeze(*args, **kwargs)
-        self._thaw()
-        return self.run()
+        self.start()
+
+        # TODO: Refactor into single run point for Job.
+        self.task.args_to_function = args
+        self.task.kwargs_to_function = kwargs
+        result = self.task.run()
+        self.finish()
+        return result
 
     def announce(self, channel):
         hxdispatcher.send(channel, {'jobs':
@@ -267,7 +267,10 @@ class Trabajo(object):
     def __repr__(self):
         return self.key
 
-    def __init__(self, report_to=None, announcer_name=None, *args, **kwargs):
+    def __init__(self,
+                 report_to=None,
+                 announcer_name=None,
+                 *args, **kwargs):
 
         self.report_handler = report_to
 
@@ -279,7 +282,7 @@ class Trabajo(object):
         self.hour = None
         self.minute = None
         self.periodic = False
-        self.current_job = None
+        self.current_job = None  # TODO: Push this knowledge down into the backend
 
         self.uid = str(uuid.uuid4())
         self.generate_code_word()
@@ -428,22 +431,28 @@ class Trabajo(object):
             )
         else:
             run_times = task_time_keys()
+            schedule = self.get_schedule()
             expiration_dt = run_times.get(self.get_schedule())
 
         return expiration_dt
 
-
-    
-    def spawn_job(self, default_report_handler=None):
-        '''
-        Create a Job object for this task and push it to the queue.
-        '''
-
+    def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.
         report_handler = self.report_handler or default_report_handler
 
         job = Job(self)
-        job.soon()
+        return job
+
+    def spawn_job_and_run_soon(self,
+                  job_list=None,
+                  default_report_handler=None,
+                  *args,
+                  **kwargs):
+        '''
+        Create a Job object for this task and push it to the queue with args and kwargs.
+        '''
+        job = self.just_spawn_job(default_report_handler)
+        job.soon(job_list=namespace(job_list), *args, **kwargs)
 
         # Now we generate a new code word for next time.
         self.generate_code_word()
@@ -459,12 +468,26 @@ class Trabajo(object):
 
         return job
 
-    def soon(self):
+    def spawn_job_and_run_now(self, *args, **kwargs):
+        job = self.just_spawn_job()
+        return job.now(*args, **kwargs)
+
+    def soon(self, tiempo_wait_for=None,
+             *args, **kwargs):
         '''
         Just like spawn_job(), but returns self instead of the job.
         '''
-        self.spawn_job()
+
+        # If we are told to wait for another task, we'll put this in the appropriately named queue.
+        self.spawn_job_and_run_soon(job_list=tiempo_wait_for, *args, **kwargs)
         return self
+
+    def now(self, *args, **kwargs):
+        """
+        runs this task NOW with the args and kwargs
+        """
+        result = self.spawn_job_and_run_now(*args, **kwargs)
+        return result
 
 
 task = Trabajo  # For compatibility as a drop-in Celery replacement.

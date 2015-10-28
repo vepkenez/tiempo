@@ -129,7 +129,10 @@ def task_time_keys():
 
 
 def namespace(group_name):
+    if group_name:
         return '%s:%s' % (REDIS_GROUP_NAMESPACE, group_name)
+
+    # returns None if passed something Falsey.
 
 
 def all_jobs(groups):

@@ -35,7 +35,7 @@ class TestTaskInQueue(TestCase):
         task_data_string = REDIS.lpop(namespace(1))
         self.assertIsNone(task_data_string)  # We haven't loaded the task into REDIS yet.
 
-        decorated.spawn_job()  # Now it's in there.
+        decorated.spawn_job_and_run_soon()  # Now it's in there.
         d = tm.cycle()  # Run the next task in line, which we hope to be the above.
 
         def assert_that_unblocker_ran(n):
