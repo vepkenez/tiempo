@@ -7,9 +7,10 @@ from tiempo import TIEMPO_REGISTRY
 
 class RegistryTests(TestCase):
 
-    def test_task_decorator_adds_callable_to_registry(self):
+    def setUp(self):
         TIEMPO_REGISTRY.clear()
 
+    def test_task_decorator_adds_callable_to_registry(self):
         task = Trabajo(priority=1, periodic=True, force_interval=1)
         decorated = task(some_callable)  # Pushes onto registry dict
 

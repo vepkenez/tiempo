@@ -1,5 +1,5 @@
 from twisted.trial.unittest import TestCase
-
+import time
 from tiempo.conn import REDIS, hear_from_backend, subscribe_to_backend_notifications
 
 
@@ -19,6 +19,7 @@ class EventsBroadCastTests(TestCase):
     def test_subscribe_notice(self):
         REDIS.flushall()
         subscribe_to_backend_notifications()
+        time.sleep(.1)
 
         subscribe_event = hear_from_backend()[0]
         self.assertEqual(subscribe_event['type'], 'psubscribe')
