@@ -67,6 +67,8 @@ class Job(object):
             self.status = 'waiting'
             self.enqueued = False
 
+        self.announcer = Announcer()
+
     def __str__(self):
         return "Job: %s / %s - (Task: %s, %s)" % (
             self.code_word,
@@ -276,8 +278,6 @@ class Trabajo(object):
 
         self.announcer_name = announcer_name
 
-        self.announcer = Announcer()
-
         self.day = None
         self.hour = None
         self.minute = None
@@ -358,10 +358,7 @@ class Trabajo(object):
         kwargs = getattr(self, 'kwargs_to_function', {})
 
         if self.announcer_name:
-            kwargs[self.announcer_name] = self.announcer
-
-            if runner:
-                self.announcer.runner = runner
+            kwargs[self.announcer_name] = runner.announcer
 
         result = func(
                 *getattr(self, 'args_to_function', ()),
@@ -435,6 +432,16 @@ class Trabajo(object):
             expiration_dt = run_times.get(self.get_schedule())
 
         return expiration_dt
+
+    def next_run_time(self):
+        '''
+        If this task is currently scheduled, returns a datetime when it will next become queued.
+
+        If not, returns None.
+
+        TODO: If task is currently enqueued, return some kind of ENQUEUED object.
+        '''
+        pass
 
     def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.

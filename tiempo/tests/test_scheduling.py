@@ -32,7 +32,7 @@ class TaskScheduleTests(TestCase):
 
     def test_minutely_tasks_expire_in_60_seconds(self):
         minutely_decorator = Trabajo(priority=1, periodic=True)
-
+        minutely = minutely_decorator(some_callable)
         now = utc_now()
 
         minutely_expiration = minutely.next_expiration_dt()

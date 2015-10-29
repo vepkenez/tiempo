@@ -62,13 +62,13 @@
         <div ng-controller='TiempoController' layout-padding>
 
             <md-list id="finishedJobs">
-                <div class="finishedJob" ng-repeat="(id, result) in tiempo.finished_runners | reverse" ng-click="result.showMore=!result.showMore">
+                <div class="finishedJob" ng-repeat="(id, result) in tiempo.results | reverse" ng-click="result.showMore=!result.showMore">
                     <div ng-class="{'error': result.error, 'success': !result.error}" class="md-list-item-text" layout="column">
                         <div flex="10">"[{result.codeWord}]" <strong>([{result.message}])</strong></div>
                         <div>[{result.finish_time| amDateFormat:'MM.DD.YYYY HH:mm:ss'}]</div>
                         <div class="errorText">[{result.result}]</div>
                         <div ng-if="result.showMore">
-                            <code>[{result.result_detail}]</code>
+                            <pre ng-repeat="detail in result.result_detail">[{detail}]</pre>
                             </div>
                         </div>
                     </div>
@@ -142,6 +142,9 @@
                 sock.onopen = function(e) {
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'history'})
+                    );
+                    sock.send(
+                        JSON.stringify({'hx_subscribe': 'results'})
                     );
                     sock.send('updateJobs');
                 };

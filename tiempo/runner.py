@@ -42,9 +42,6 @@ class Runner(object):
     def __repr__(self):
         return 'Tiempo Runner %d' % self.number
 
-    def cleanup(self):
-        pass
-
     def cycle(self):
         '''
         If idle, find a job and run it.3
@@ -107,26 +104,33 @@ class Runner(object):
                 raise
 
         task = self.current_job.task
-        self.announcer = task.announcer
+        self.announcer = self.current_job.announcer
 
         return task.run(runner=self)
 
-    def finish_job(self, result):
+    def cleanup(self, result):
         self.current_job.finish()
 
         self.current_job = self.start_time = self.finish_time = None
 
-        self.announce('runners')  # Announce that the runner is back to idle.
         self.error_state = False
+        self.announce('runners')  # Announce that the runner is back to idle.
         return  # And go back to cycling.
 
     def handle_success(self, return_value):
         self.finish_time = utc_now()
         runner_dict = self.serialize_to_dict()
         runner_dict.update({'return_value': str(return_value)})
+
+        runner_dict.update({'result': self.announcer.results_brief})
+        runner_dict.update({'result_detail': self.announcer.results_detail})
+
+        ##
         hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
-        REDIS.hset('successes', self.current_job.uid, json.dumps(runner_dict))
-        return self.finish_job(return_value)
+        REDIS.hmset('results:%s' % self.current_job.uid, runner_dict)
+        ##
+
+        return self.cleanup(return_value)
 
     def handle_error(self, failure):
         self.finish_time = utc_now()
@@ -134,10 +138,12 @@ class Runner(object):
         logger.info(failure.getBriefTraceback())  # TODO: What level do we want this to be?
         runner_dict = self.serialize_to_dict()
         runner_dict.update({'result': str(failure.value)})
-        runner_dict.update({'result_detail': str(failure.getTraceback())})
+        detail = runner_dict['result_detail'] = self.announcer.results_detail
+        detail.append(str(failure.getTraceback()))
+        # REDIS.hset('results', self.current_job.uid, json.dumps(runner_dict))
         hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
-        REDIS.hset('errors', self.current_job.uid, json.dumps(runner_dict))
-        return self.finish_job(failure)
+
+        return self.cleanup(failure)
 
     def serialize_to_dict(self, alert=False):
         if self.current_job:
@@ -170,7 +176,7 @@ class Runner(object):
             if self.announcer.progress_increments:
                 progress_percentage = (float(self.announcer.progress) / float(self.announcer.progress_increments)) * 100
                 d['total_progress'] = progress_percentage
-                logger.info("Reporting Progress for %s as %s" % (self, progress_percentage))
+                logger.debug("Reporting Progress for %s as %s" % (self, progress_percentage))
 
         return d
 

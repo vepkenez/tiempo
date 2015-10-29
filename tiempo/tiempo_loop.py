@@ -56,7 +56,7 @@ def cycle():
                 )
 
                 # OK, we're ready to queue up a new job for this task!
-                task.spawn_job(default_report_handler=default_report_handler)
+                task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
 
     events = hear_from_backend()
     if events:

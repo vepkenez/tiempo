@@ -3,7 +3,7 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Reelio Tiempo Dashboard</title>
+        <title>Tiempo Kiosk</title>
         <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/0.11.2/angular-material.min.css">
 
         <style type="text/css">
@@ -99,9 +99,8 @@
                                 </div>
                                 <div flex='40'>[{runner.message}]</div>
                                 <div flex='10'>
-                                    <md-progress-circular md-diameter="24px" md-mode="determinate" value="[{runner.total_progress}]">
-
-                                    </md-progress-circular>[{runner.total_progress}]
+                                    <md-progress-circular md-diameter="24px" md-mode="indeterminate" value="[{runner.total_progress}]">
+                                    </md-progress-circular>
                                 </div>
                             </div>
                         </md-list-item>
@@ -239,6 +238,9 @@
                     );
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'successes'})
+                    );
+                    sock.send(
+                        JSON.stringify({'hx_subscribe': 'runners'})
                     );
                     sock.send('updateJobs');
                 };
