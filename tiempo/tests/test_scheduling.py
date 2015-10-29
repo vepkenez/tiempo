@@ -4,7 +4,7 @@ from twisted.trial.unittest import TestCase
 from tiempo import TIEMPO_REGISTRY
 from sample_tasks import some_callable
 from tiempo.conn import REDIS
-from tiempo.utils import namespace
+from tiempo.utils import namespace, utc_now
 from tiempo.work import Trabajo, Job
 
 
@@ -14,18 +14,30 @@ class TaskScheduleTests(TestCase):
         TIEMPO_REGISTRY.clear()
         REDIS.flushall()
 
-    def test_scheduled_tasks(self):
-        minutely_decorator = Trabajo(priority=1, periodic=True, minute=1)
-        hourly_decorator = Trabajo(priority=1, periodic=True, hour=1)
-        daily_decorator = Trabajo(priority=1, periodic=True, day=1)
+    def test_scheduled_tasks_have_proper_schedule(self):
+        minutely_decorator = Trabajo(priority=1, periodic=True)
+        hourly_decorator = Trabajo(priority=1, periodic=True, minute=1)
+        daily_decorator = Trabajo(priority=1, periodic=True, hour=1)
+        weekly_decorator = Trabajo(priority=1, periodic=True, day=1)
 
         minutely = minutely_decorator(some_callable)
         hourly = hourly_decorator(some_callable)
         daily = daily_decorator(some_callable)
+        weekly = weekly_decorator(some_callable)
 
-        self.assertEqual(minutely.get_schedule(), '*.*.01')
-        self.assertEqual(hourly.get_schedule(), '*.01.*')
-        self.assertEqual(daily.get_schedule(), '01.*.*')
+        self.assertEqual(minutely.get_schedule(), '*.*.*')
+        self.assertEqual(hourly.get_schedule(), '*.*.01')
+        self.assertEqual(daily.get_schedule(), '*.01.*')
+        self.assertEqual(weekly.get_schedule(), '01.*.*')
+
+    def test_minutely_tasks_expire_in_60_seconds(self):
+        minutely_decorator = Trabajo(priority=1, periodic=True)
+
+        now = utc_now()
+
+        minutely_expiration = minutely.next_expiration_dt()
+        minutely_delta = minutely_expiration - now
+        self.assertEqual(minutely_delta.seconds, 60)
 
     def test_now_with_args_runs_with_args(self):
         no_schedule_decorator = Trabajo(priority=1)
