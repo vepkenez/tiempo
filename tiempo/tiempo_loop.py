@@ -15,12 +15,7 @@ default_report_handler = None
 ps = REDIS.pubsub()
 
 
-def cycle():
-    this_loop_runtime = utc_now()
-
-    # This loop basically does two things:
-
-    # Thing 1) Let the runners pick up any queued tasks.
+def let_runners_pick_up_queued_tasks():
     for runner in all_runners():
 
         result = runner.cycle()
@@ -32,12 +27,13 @@ def cycle():
 
         runner.announce('runners')  # The runner may have changed state; announce it.
 
-    # Thing 2) Queue up new tasks.
-    for task_string, task in TIEMPO_REGISTRY.items():
 
+def queue_up_new_tasks():
+    for task_string, task in TIEMPO_REGISTRY.items():
+        now = utc_now()
         ### REPLACE with task.next_expiration_dt()
         if hasattr(task, 'force_interval'):
-            expire_key = this_loop_runtime + datetime.timedelta(
+            expire_key = now + datetime.timedelta(
                     seconds=task.force_interval
             )
         else:
@@ -49,16 +45,24 @@ def cycle():
 
             if stop_key_has_expired:
 
-                seconds_until_expiration = int(float((expire_key - this_loop_runtime).total_seconds())) - 1
+                seconds_until_expiration = int(float((expire_key - now).total_seconds())) - 1
                 REDIS.expire(
                     task.stop_key,
                     seconds_until_expiration
                 )
 
                 # OK, we're ready to queue up a new job for this task!
-                task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
+                return task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
 
-    events = hear_from_backend()
+
+def broadcast_new_announcements_to_listeners():
+    try:
+        events = hear_from_backend()
+    except AttributeError, e:
+        if e.args[0] == "'NoneType' object has no attribute 'can_read'":
+            logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")
+            events = None
+
     if events:
         for event in events:
             if not event['type'] == 'psubscribe':
@@ -69,6 +73,18 @@ def cycle():
                     hxdispatcher.send(channel_to_announce, {channel_to_announce: {new_value['jobUid']: new_value}})
                 else:
                     hxdispatcher.send(channel_to_announce, {channel_to_announce: new_value})
+
+
+def cycle():
+    # This loop does three things:
+
+    # Thing 1) Let the runners pick up any queued tasks.
+    let_runners_pick_up_queued_tasks()
+    # Thing 2) Queue up new tasks.
+    queue_up_new_tasks()
+
+    # Thing 3) Broadcast any new announcements to listeners.
+    broadcast_new_announcements_to_listeners()
 
 looper = task.LoopingCall(cycle)
 

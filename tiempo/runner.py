@@ -189,3 +189,8 @@ class Runner(object):
                                   }
                           }
                           )
+
+    def shut_down(self):
+        for runner_list in RUNNERS.values():
+            if self in runner_list:
+                runner_list.remove(self)
