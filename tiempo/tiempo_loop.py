@@ -1,11 +1,11 @@
 import datetime
-from hendrix.contrib.async.messaging import hxdispatcher
+from tiempo import TIEMPO_REGISTRY, all_runners
 
+from hendrix.contrib.async.messaging import hxdispatcher
 from twisted.internet import task
 from twisted.logger import Logger
 
 from constants import BUSY, IDLE
-from tiempo import TIEMPO_REGISTRY, all_runners
 from tiempo.conn import REDIS, subscribe_to_backend_notifications, hear_from_backend
 from tiempo.utils import utc_now, task_time_keys
 from tiempo.work import announce_tasks_to_client
@@ -32,7 +32,7 @@ def queue_up_new_tasks():
     for task_string, task in TIEMPO_REGISTRY.items():
         now = utc_now()
         ### REPLACE with task.next_expiration_dt()
-        if hasattr(task, 'force_interval'):
+        if task.force_interval:
             expire_key = now + datetime.timedelta(
                     seconds=task.force_interval
             )

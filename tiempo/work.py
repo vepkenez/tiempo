@@ -339,7 +339,7 @@ class Trabajo(object):
         return self.code_word
 
     def serialize_to_dict(self):
-        next_run_time = self.next_expiration_dt()
+        next_run_time = self.datetime_of_subsequent_run()
         if next_run_time:
             next_run_time = next_run_time.isoformat()
 
@@ -460,14 +460,14 @@ class Trabajo(object):
         dt = dt or utc_now()
 
         if self.is_planned():
-            r = relativedelta()
+            r = relativedelta(minutes=+1)
 
             next_hour = False
             next_day = False
 
             if self.minute:
                 r += relativedelta(minute=self.minute)
-                next_hour = dt.minute > self.minute
+                next_hour = self.minute > dt.minute
 
             if self.hour:
                 r += relativedelta(hour=self.hour)
@@ -486,6 +486,19 @@ class Trabajo(object):
             return r
         else:
             return None
+
+    def datetime_of_subsequent_run(self, dt=None):
+        """
+        Takes a datetime, which defaults to utc_now().
+
+        If this task is currently planned, returns the first time after dt when this task is eligible to be run.
+
+        Otherwise, returns None.
+        """
+        dt = dt or utc_now()
+        r = self.delta_until_run_time(dt)
+        if r:
+            return dt + r
 
     def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.

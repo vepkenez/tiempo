@@ -1,6 +1,7 @@
 import json
 import uuid
 from tiempo import TIEMPO_REGISTRY
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
 from twisted.trial.unittest import TestCase
@@ -18,6 +19,7 @@ class TaskScheduleTests(TestCase):
     def setUp(self):
         TIEMPO_REGISTRY.clear()
         REDIS.flushall()
+        self.check_from_time = datetime(2006, 4, 26, 12, 30, 45)
 
     def test_scheduled_tasks_have_proper_schedule(self):
         minutely = minutely_task(some_callable)
@@ -26,7 +28,7 @@ class TaskScheduleTests(TestCase):
         monthly = monthly_task(some_callable)
 
         self.assertEqual(minutely.get_schedule(), '*.*.*')
-        self.assertEqual(hourly.get_schedule(), '*.*.01')
+        self.assertEqual(hourly.get_schedule(), '*.*.30')
         self.assertEqual(daily.get_schedule(), '*.01.*')
         self.assertEqual(monthly.get_schedule(), '04.14.17')
 
@@ -83,8 +85,17 @@ class TaskScheduleTests(TestCase):
         minutely = minutely_task(some_callable)
         self.assertTrue(minutely.is_planned())
 
-    def test_scheduled_task_has_next_runtime(self):
-        monthly = monthly_task(some_callable)
-        delta = monthly.delta_until_run_time()
-        self.assertEqual(delta, relativedelta(day=4, hour=14, minute=17))
+    def test_hourly_runs_this_hour(self):
+        task = Trabajo(periodic=True, minute=20)(some_callable)
+        delta = task.delta_until_run_time(self.check_from_time)
+        self.assertEqual(delta, relativedelta(minute=20))
 
+    def test_hourly_runs_next_hour(self):
+        task = Trabajo(periodic=True, minute=40)(some_callable)
+        delta = task.delta_until_run_time(self.check_from_time)
+        self.assertEqual(delta, relativedelta(hour=1, minute=40))
+
+    def test_monthly_has_complete_delta(self):
+        monthly = monthly_task(some_callable)
+        monthly_delta = monthly.delta_until_run_time()
+        self.assertEqual(monthly_delta, relativedelta(day=4, hour=14, minute=17))
