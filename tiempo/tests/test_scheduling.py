@@ -1,11 +1,16 @@
 import json
 import uuid
-from twisted.trial.unittest import TestCase
 from tiempo import TIEMPO_REGISTRY
+from dateutil.relativedelta import relativedelta
+
+from twisted.trial.unittest import TestCase
+
 from sample_tasks import some_callable
 from tiempo.conn import REDIS
 from tiempo.utils import namespace, utc_now
-from tiempo.work import Trabajo, Job
+from tiempo.work import Trabajo
+
+from tiempo.utils.premade_decorators import daily_task, hourly_task, monthly_task, minutely_task, unplanned_task
 
 
 class TaskScheduleTests(TestCase):
@@ -15,24 +20,19 @@ class TaskScheduleTests(TestCase):
         REDIS.flushall()
 
     def test_scheduled_tasks_have_proper_schedule(self):
-        minutely_decorator = Trabajo(priority=1, periodic=True)
-        hourly_decorator = Trabajo(priority=1, periodic=True, minute=1)
-        daily_decorator = Trabajo(priority=1, periodic=True, hour=1)
-        weekly_decorator = Trabajo(priority=1, periodic=True, day=1)
-
-        minutely = minutely_decorator(some_callable)
-        hourly = hourly_decorator(some_callable)
-        daily = daily_decorator(some_callable)
-        weekly = weekly_decorator(some_callable)
+        minutely = minutely_task(some_callable)
+        hourly = hourly_task(some_callable)
+        daily = daily_task(some_callable)
+        monthly = monthly_task(some_callable)
 
         self.assertEqual(minutely.get_schedule(), '*.*.*')
         self.assertEqual(hourly.get_schedule(), '*.*.01')
         self.assertEqual(daily.get_schedule(), '*.01.*')
-        self.assertEqual(weekly.get_schedule(), '01.*.*')
+        self.assertEqual(monthly.get_schedule(), '04.14.17')
 
     def test_minutely_tasks_expire_in_60_seconds(self):
-        minutely_decorator = Trabajo(priority=1, periodic=True)
-        minutely = minutely_decorator(some_callable)
+        minutely_task = Trabajo(priority=1, periodic=True)
+        minutely = minutely_task(some_callable)
         now = utc_now()
 
         minutely_expiration = minutely.next_expiration_dt()
@@ -40,8 +40,7 @@ class TaskScheduleTests(TestCase):
         self.assertEqual(minutely_delta.seconds, 60)
 
     def test_now_with_args_runs_with_args(self):
-        no_schedule_decorator = Trabajo(priority=1)
-        unscheduled_task = no_schedule_decorator(some_callable)
+        unscheduled_task = unplanned_task(some_callable)
         random_arg = uuid.uuid4()
         result = unscheduled_task.now(random_arg)
 
@@ -50,10 +49,9 @@ class TaskScheduleTests(TestCase):
         self.assertEqual(args[0], random_arg)
 
     def test_dependent_task_gets_scheduled_by_soon(self):
-        no_schedule_decorator = Trabajo(priority=1)
         this_may_as_well_be_a_uid = "a large farva"
 
-        dependent_task = no_schedule_decorator(some_callable)
+        dependent_task = unplanned_task(some_callable)
 
         dependent_task.soon(tiempo_wait_for=this_may_as_well_be_a_uid, run_with="something_very_unique_and_strange")
         task_dict_json = REDIS.lpop(namespace(this_may_as_well_be_a_uid))
@@ -61,10 +59,9 @@ class TaskScheduleTests(TestCase):
         self.assertEqual(task_dict['kwargs_to_function']['run_with'], "something_very_unique_and_strange")
 
     def test_dependent_task_is_queued_after_trigger_task(self):
-        no_schedule_decorator = Trabajo(priority=1)
-        unscheduled_task = no_schedule_decorator(some_callable)
+        unscheduled_task = unplanned_task(some_callable)
 
-        dependent_task = no_schedule_decorator(some_callable)
+        dependent_task = unplanned_task(some_callable)
 
         # Mark this task as dependent on unscheduled_task.
         dependent_task.soon(tiempo_wait_for=unscheduled_task.uid, litre_cola=True)
@@ -77,4 +74,17 @@ class TaskScheduleTests(TestCase):
         task_dict = json.loads(task_dict_json)
 
         self.assertTrue(task_dict['kwargs_to_function'].has_key('litre_cola'))
+
+    def test_unscheduled_task_is_unplanned(self):
+        unscheduled_task = unplanned_task(some_callable)
+        self.assertFalse(unscheduled_task.is_planned())
+
+    def test_scheduled_task_is_planned(self):
+        minutely = minutely_task(some_callable)
+        self.assertTrue(minutely.is_planned())
+
+    def test_scheduled_task_has_next_runtime(self):
+        monthly = monthly_task(some_callable)
+        delta = monthly.delta_until_run_time()
+        self.assertEqual(delta, relativedelta(day=4, hour=14, minute=17))
 

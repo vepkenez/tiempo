@@ -66,9 +66,9 @@
             <md-list id="finishedJobs" class='md-whiteframe-z1'>
                 <div class="finishedJob" ng-repeat="(id, result) in tiempo.results | reverse |limitTo: 10" >
                     <div ng-class="{'error': result.error_message, 'success': !result.error_message}" class="md-list-item-text" layout="column">
-                        <div flex="10">"[{result.codeWord}]" <strong>([{result.message}])</strong></div>
-                        <div><span am-time-ago="result.finish_time"></span></div>
-                        <div class="errorText">[{result.error_message}]</div>
+                        <div flex="10"><strong>[{result.message}]</strong></div>
+                        <div><small>"[{result.codeWord}]"</small> - <span am-time-ago="result.finish_time"></span></div>
+                        <div class="errorText">[{result.result}]</div>
                     </div>
                 </div>
             </md-list>
@@ -141,8 +141,9 @@
                     <md-list-item>
                         <div flex='100' layout='row' layout-align='space-around center'>
                             <div flex="20">Next Job</div>
-                            <div flex='40'>Task path</div>
-                            <div flex='40'>Next Run Time</div>
+                            <div flex='30'>Task path</div>
+                            <div flex="30"></div>
+                            <div flex='20'>Next Run Time</div>
                         </div>
                     </md-list-item>
 

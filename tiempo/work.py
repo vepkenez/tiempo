@@ -1,15 +1,17 @@
+from tiempo import RECENT_KEY
+
 from dateutil.relativedelta import relativedelta
-from tiempo import RUNNERS, RECENT_KEY
+from hendrix.contrib.async.messaging import hxdispatcher
+
 from tiempo.announce import Announcer
 from tiempo.conf import RESULT_LIFESPAN
 from tiempo.utils import utc_now, namespace, task_time_keys
-from hendrix.contrib.async.messaging import hxdispatcher
-from twisted.internet import task
+
 
 try:
     from django.utils.encoding import force_bytes
 except ImportError:
-    from .utils import force_bytes
+    from tiempo.utils import force_bytes
 
 try:
     from six.moves import cPickle as pickle
@@ -22,7 +24,6 @@ from .conn import REDIS
 
 import inspect
 import uuid
-import base64
 import importlib
 import functools
 import datetime
@@ -282,6 +283,7 @@ class Trabajo(object):
         self.hour = None
         self.minute = None
         self.periodic = False
+        self.force_interval = None
         self.current_job = None  # TODO: Push this knowledge down into the backend
 
         self.uid = str(uuid.uuid4())
@@ -402,6 +404,16 @@ class Trabajo(object):
         else:
             print "could not find function", self.func
 
+    def is_planned(self):
+        '''
+        TODO: Account for dependent tasks and tasks that have recently
+        had their 'soon()' method called.
+        '''
+        if not self.force_interval and not self.periodic:
+            return False
+        else:
+            return True
+
     def get_schedule(self):
         if self.periodic:
             sched = [
@@ -422,7 +434,7 @@ class Trabajo(object):
         '''
         The next future datetime at which this trabajo's waiting period will expire.
         '''
-        if hasattr(self, 'force_interval'):
+        if self.force_interval:
             expiration_dt = utc_now() + datetime.timedelta(
                 seconds=self.force_interval
             )
@@ -433,15 +445,47 @@ class Trabajo(object):
 
         return expiration_dt
 
-    def next_run_time(self):
+    def delta_until_run_time(self, dt=None):
         '''
-        If this task is currently scheduled, returns a datetime when it will next become queued.
+        Takes a datetime, which defaults to utc_now().
 
-        If not, returns None.
+        If this task is currently planned, returns a relativedelta from dt when it is eligible to be queued.
+
+        (e.g., if it's 3:51, and this Trabajo run every hour at 20 after the hour, then this function will return relativedelta(hours=+1, minute=20), the duration from now until 4:20)
+
+        If not planned, returns None.
 
         TODO: If task is currently enqueued, return some kind of ENQUEUED object.
         '''
-        pass
+        dt = dt or utc_now()
+
+        if self.is_planned():
+            r = relativedelta()
+
+            next_hour = False
+            next_day = False
+
+            if self.minute:
+                r += relativedelta(minute=self.minute)
+                next_hour = dt.minute > self.minute
+
+            if self.hour:
+                r += relativedelta(hour=self.hour)
+                if dt.hour > self.hour:
+                    next_day = True
+            elif next_hour:
+                r += relativedelta(hour=+1)
+
+            if self.day:
+                r += relativedelta(day=self.day)
+                if dt.day > self.day:
+                    r += relativedelta(months=+1)
+            elif next_day:
+                r += relativedelta(day=+1)
+
+            return r
+        else:
+            return None
 
     def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.
