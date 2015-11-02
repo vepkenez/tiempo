@@ -342,6 +342,8 @@ class Trabajo(object):
         next_run_time = self.datetime_of_subsequent_run()
         if next_run_time:
             next_run_time = next_run_time.isoformat()
+        else:
+            next_run_time = "Unscheduled."
 
         task_as_dict = {
             'codeWord': self.code_word,
@@ -445,13 +447,20 @@ class Trabajo(object):
 
         return expiration_dt
 
+    def runs_every_minute(self):
+        '''
+        A convenience method to determine whether a task
+        runs once per minute on schedule.
+        '''
+        return self.periodic and not(self.force_interval or self.minute or self.hour or self.day)
+
     def delta_until_run_time(self, dt=None):
         '''
         Takes a datetime, which defaults to utc_now().
 
         If this task is currently planned, returns a relativedelta from dt when it is eligible to be queued.
 
-        (e.g., if it's 3:51, and this Trabajo run every hour at 20 after the hour, then this function will return relativedelta(hours=+1, minute=20), the duration from now until 4:20)
+        (e.g., if it's 3:51, and this Trabajo runs every hour at 20 after the hour, then this function will return relativedelta(hours=+1, minute=20), the duration from now until 4:20)
 
         If not planned, returns None.
 
@@ -460,7 +469,12 @@ class Trabajo(object):
         dt = dt or utc_now()
 
         if self.is_planned():
-            r = relativedelta(minutes=+1)
+
+            # If this task runs every minute, we know that we need to simply add a minute to the dt to get the next runtime.
+            if self.runs_every_minute():
+                return relativedelta(minutes=+1)
+
+            r = relativedelta()
 
             next_hour = False
             next_day = False

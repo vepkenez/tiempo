@@ -85,6 +85,11 @@ class TaskScheduleTests(TestCase):
         minutely = minutely_task(some_callable)
         self.assertTrue(minutely.is_planned())
 
+    def test_minutely_task_runs_next_minute(self):
+        task = minutely_task(some_callable)
+        delta = task.delta_until_run_time(self.check_from_time)
+        self.assertEqual(delta, relativedelta(minutes=+1))
+
     def test_hourly_runs_this_hour(self):
         task = Trabajo(periodic=True, minute=20)(some_callable)
         delta = task.delta_until_run_time(self.check_from_time)
