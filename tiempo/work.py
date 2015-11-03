@@ -266,6 +266,14 @@ starting at %(start)s"""%data
 
 
 class Trabajo(object):
+    '''
+    espanol for task, and used interchangably with that word through Tiempo.
+
+    This is the center of Tiempo's work model.
+
+    A task is a callable and a set of scheduling logic that determines
+    when and how to enqueue and run that callable.
+    '''
 
     def __repr__(self):
         return self.key
@@ -470,6 +478,9 @@ class Trabajo(object):
 
         if self.is_planned():
 
+            if self.force_interval:
+                raise RuntimeError("Not implemented.")
+
             # If this task runs every minute, we know that we need to simply add a minute to the dt to get the next runtime.
             if self.runs_every_minute():
                 return relativedelta(minutes=+1)
@@ -481,21 +492,25 @@ class Trabajo(object):
 
             if self.minute:
                 r += relativedelta(minute=self.minute)
-                next_hour = self.minute > dt.minute
+
+                # Read as "If the current minute is already past the minute of run time, we do this next hour."
+                next_hour = dt.minute >= self.minute
 
             if self.hour:
                 r += relativedelta(hour=self.hour)
-                if dt.hour > self.hour:
+
+                # Same as 'next hour' above, but for day.
+                if dt.hour >= self.hour:
                     next_day = True
             elif next_hour:
-                r += relativedelta(hour=+1)
+                r += relativedelta(hours=+1)
 
             if self.day:
                 r += relativedelta(day=self.day)
-                if dt.day > self.day:
+                if dt.day >= self.day:
                     r += relativedelta(months=+1)
             elif next_day:
-                r += relativedelta(day=+1)
+                r += relativedelta(days=+1)
 
             return r
         else:
@@ -513,6 +528,35 @@ class Trabajo(object):
         r = self.delta_until_run_time(dt)
         if r:
             return dt + r
+
+    def check_schedule(self, window_begin=None, window_end=None):
+        '''
+        Takes a datetime, window_begin, which defaults to utc_now().
+        Takes a datetime, window_end, which default to one hour after dt.
+
+        Checks to see if this task can be enqueued at 1 or more times
+        between window_begin and window_end.
+
+        Returns a list of datetime objects at which scheduling this task is appropriate.
+        '''
+        window_begin = window_begin or utc_now()
+        window_end = window_end or window_begin + datetime.timedelta(hours=1)
+        dt_of_next_run = self.datetime_of_subsequent_run(window_begin)
+
+        # Recursion happening here, but not too hard to follow.
+        if dt_of_next_run:
+            if dt_of_next_run > window_end:
+                return # If the next run is after the end of the window, return None as a sentinel.
+            else:
+                # Otherwise, figure out the subsequent run after that one by running this method again.
+                subsequent = self.check_schedule(dt_of_next_run, window_end)
+                if subsequent:
+                    # If that one exists, return a list of the next datetime and the subsequent one (and, because we're recursing, the one after that, and so on).
+                    run_times = [dt_of_next_run] + subsequent
+                else:
+                    # If not, then we have discovered the last one; just return a list and let it be appended by the recursive callers as above.
+                    run_times = [dt_of_next_run]
+                return run_times
 
     def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.
@@ -553,7 +597,9 @@ class Trabajo(object):
     def soon(self, tiempo_wait_for=None,
              *args, **kwargs):
         '''
-        Just like spawn_job(), but returns self instead of the job.
+        Just like spawn_job_and_run_roon(), but returns self instead of the job.
+
+        Also takes argument "tiempo_wait_for" for backward compat.
         '''
 
         # If we are told to wait for another task, we'll put this in the appropriately named queue.

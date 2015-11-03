@@ -90,15 +90,20 @@ class TaskScheduleTests(TestCase):
         delta = task.delta_until_run_time(self.check_from_time)
         self.assertEqual(delta, relativedelta(minutes=+1))
 
+    '''
+    Next two tests:
+    Our test time is at 30 after the hour, so a task scheduled for 40
+    will run this hour; a task scheduled for 20 will run next hour.
+    '''
     def test_hourly_runs_this_hour(self):
-        task = Trabajo(periodic=True, minute=20)(some_callable)
-        delta = task.delta_until_run_time(self.check_from_time)
-        self.assertEqual(delta, relativedelta(minute=20))
-
-    def test_hourly_runs_next_hour(self):
         task = Trabajo(periodic=True, minute=40)(some_callable)
         delta = task.delta_until_run_time(self.check_from_time)
-        self.assertEqual(delta, relativedelta(hour=1, minute=40))
+        self.assertEqual(delta, relativedelta(minute=40))
+
+    def test_hourly_runs_next_hour(self):
+        task = Trabajo(periodic=True, minute=20)(some_callable)
+        delta = task.delta_until_run_time(self.check_from_time)
+        self.assertEqual(delta, relativedelta(hours=+1, minute=20))
 
     def test_monthly_has_complete_delta(self):
         monthly = monthly_task(some_callable)
