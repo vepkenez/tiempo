@@ -1,4 +1,4 @@
-import datetime
+import calendar
 from tiempo import TIEMPO_REGISTRY, all_runners
 
 from hendrix.contrib.async.messaging import hxdispatcher
@@ -7,12 +7,28 @@ from twisted.logger import Logger
 
 from constants import BUSY, IDLE
 from tiempo.conn import REDIS, subscribe_to_backend_notifications, hear_from_backend
-from tiempo.utils import utc_now, task_time_keys
+from tiempo.utils import namespace
 from tiempo.work import announce_tasks_to_client
 
 logger = Logger()
 default_report_handler = None
 ps = REDIS.pubsub()
+
+
+def cycle():
+    # This loop does four things:
+
+    # Thing 1) Let the runners pick up any queued tasks.
+    let_runners_pick_up_queued_tasks()
+    # Thing 2) Queue up new tasks.
+    queue_scheduled_tasks()
+    # Thing 3) Schedule new tasks for enqueing.
+    schedule_tasks_for_queueing()
+
+    # Thing 4) Broadcast any new announcements to listeners.
+    broadcast_new_announcements_to_listeners()
+
+looper = task.LoopingCall(cycle)
 
 
 def let_runners_pick_up_queued_tasks():
@@ -27,6 +43,23 @@ def let_runners_pick_up_queued_tasks():
 
         runner.announce('runners')  # The runner may have changed state; announce it.
 
+
+def schedule_tasks_for_queueing():
+    pipe = REDIS.pipeline()  # TODO: Implement distrubted locking.
+    for task in TIEMPO_REGISTRY.values():
+        run_times = task.check_schedule()
+
+        for run_time in run_times:
+            # TODO: There's probably a better namespace for this - maybe a UUID to assigned to the job that eventually gets spawned.
+            unix_time = calendar.timegm(run_time.timetuple())
+            key = namespace('scheduled:%s:%s' % (task.key, unix_time))
+            pipe.set(key, 0)
+            pipe.expireat(key, unix_time)
+
+        # After loop, set final time.
+        pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
+
+        pipe.execute()
 
 def queue_up_new_tasks():
     for task_string, task in TIEMPO_REGISTRY.items():
@@ -73,20 +106,6 @@ def broadcast_new_announcements_to_listeners():
                     hxdispatcher.send(channel_to_announce, {channel_to_announce: {new_value['jobUid']: new_value}})
                 else:
                     hxdispatcher.send(channel_to_announce, {channel_to_announce: new_value})
-
-
-def cycle():
-    # This loop does three things:
-
-    # Thing 1) Let the runners pick up any queued tasks.
-    let_runners_pick_up_queued_tasks()
-    # Thing 2) Queue up new tasks.
-    queue_up_new_tasks()
-
-    # Thing 3) Broadcast any new announcements to listeners.
-    broadcast_new_announcements_to_listeners()
-
-looper = task.LoopingCall(cycle)
 
 
 def start():

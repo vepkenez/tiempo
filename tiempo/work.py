@@ -4,7 +4,7 @@ from dateutil.relativedelta import relativedelta
 from hendrix.contrib.async.messaging import hxdispatcher
 
 from tiempo.announce import Announcer
-from tiempo.conf import RESULT_LIFESPAN
+from tiempo.conf import RESULT_LIFESPAN, SCHEDULE_AHEAD_MINUTES, MAX_SCHEDULE_AHEAD_JOBS
 from tiempo.utils import utc_now, namespace, task_time_keys
 
 
@@ -281,8 +281,10 @@ class Trabajo(object):
     def __init__(self,
                  report_to=None,
                  announcer_name=None,
+                 max_schedule_ahead=None,
                  *args, **kwargs):
 
+        self.max_schedule_ahead = max_schedule_ahead or MAX_SCHEDULE_AHEAD_JOBS
         self.report_handler = report_to
 
         self.announcer_name = announcer_name
@@ -479,7 +481,12 @@ class Trabajo(object):
         if self.is_planned():
 
             if self.force_interval:
-                raise RuntimeError("Not implemented.")
+                seconds = self.force_interval
+                last_run = REDIS.get(namespace("last_run:%s" % self.uid))
+                if not last_run:
+                    return datetime.timedelta(seconds=seconds)
+                else:
+                    raise RuntimeError("Not implemented.")
 
             # If this task runs every minute, we know that we need to simply add a minute to the dt to get the next runtime.
             if self.runs_every_minute():
@@ -526,12 +533,12 @@ class Trabajo(object):
         """
         dt = dt or utc_now()
         r = self.delta_until_run_time(dt)
-        if r:
+        if r is not None:
             return dt + r
 
     def check_schedule(self, window_begin=None, window_end=None):
         '''
-        Takes a datetime, window_begin, which defaults to utc_now().
+        Takes a datetime, window_begin, which defaults to utc_now() without microseconds.
         Takes a datetime, window_end, which default to one hour after dt.
 
         Checks to see if this task can be enqueued at 1 or more times
@@ -539,24 +546,50 @@ class Trabajo(object):
 
         Returns a list of datetime objects at which scheduling this task is appropriate.
         '''
-        window_begin = window_begin or utc_now()
-        window_end = window_end or window_begin + datetime.timedelta(hours=1)
-        dt_of_next_run = self.datetime_of_subsequent_run(window_begin)
+        window_begin = window_begin or utc_now().replace(microsecond=0)
+        window_end = window_end or window_begin + datetime.timedelta(minutes=SCHEDULE_AHEAD_MINUTES)
 
-        # Recursion happening here, but not too hard to follow.
-        if dt_of_next_run:
-            if dt_of_next_run > window_end:
-                return # If the next run is after the end of the window, return None as a sentinel.
-            else:
-                # Otherwise, figure out the subsequent run after that one by running this method again.
-                subsequent = self.check_schedule(dt_of_next_run, window_end)
-                if subsequent:
-                    # If that one exists, return a list of the next datetime and the subsequent one (and, because we're recursing, the one after that, and so on).
-                    run_times = [dt_of_next_run] + subsequent
+        run_times = []
+
+        while True:
+            if len(run_times) >= self.max_schedule_ahead:
+                break
+
+            dt_of_next_run = self.datetime_of_subsequent_run(window_begin)
+
+            if dt_of_next_run:
+                if dt_of_next_run < window_end:
+
+                    # This dt checks out.  Add it.
+                    run_times.append(dt_of_next_run)
+
+                    # To find a subsequent run, start searching at this time.
+                    window_begin = dt_of_next_run
+
                 else:
-                    # If not, then we have discovered the last one; just return a list and let it be appended by the recursive callers as above.
-                    run_times = [dt_of_next_run]
-                return run_times
+                    break  # This dt is after the window_end.
+            else:
+                break # There is no qualifying dt in this timeframe.
+        return run_times
+
+    def currently_scheduled_keys(self):
+        '''
+        Returns the backend keys for currently scheduled future runs.
+        '''
+        pattern = namespace('scheduled:%s:*' % self.key)
+        keys = REDIS.keys(pattern)
+        return keys
+
+    def currently_scheduled_in_seconds(self):
+        '''
+        Returns a list of ints or longs, with each item being a number of seconds in the future at which this task will run.
+        '''
+        pipe = REDIS.pipeline()
+        for key in self.currently_scheduled_keys():
+            pipe.ttl(key)
+        seconds_list = pipe.execute()
+        seconds_list.sort()
+        return seconds_list
 
     def just_spawn_job(self, default_report_handler=None):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.

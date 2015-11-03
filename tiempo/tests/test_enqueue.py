@@ -14,7 +14,7 @@ class TaskQueueTests(TestCase):
 
         # Since our task runs at the first hour, we expect it not to be scheduled in this window.
         queued = task.check_schedule(window_begin, window_end)
-        self.assertIsNone(queued)
+        self.assertEqual(queued, [])
 
     def test_hourly_task_is_scheduled_three_times_in_three_hours(self):
         task = hourly_task(some_callable)

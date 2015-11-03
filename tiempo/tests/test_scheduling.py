@@ -1,6 +1,6 @@
 import json
 import uuid
-from tiempo import TIEMPO_REGISTRY
+from tiempo import TIEMPO_REGISTRY, tiempo_loop
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 
@@ -12,6 +12,36 @@ from tiempo.utils import namespace, utc_now
 from tiempo.work import Trabajo
 
 from tiempo.utils.premade_decorators import daily_task, hourly_task, monthly_task, minutely_task, unplanned_task
+
+
+class ScheduleBackendTests(TestCase):
+
+    def setUp(self):
+        TIEMPO_REGISTRY.clear()
+        REDIS.flushall()
+
+    def test_force_interval_gets_job_scheduled_on_first_cycle(self):
+        schedule_ahead = 50
+        decorated = Trabajo(force_interval=3, max_schedule_ahead=schedule_ahead)(some_callable)
+
+        # Now do the scheduling.
+        tiempo_loop.schedule_tasks_for_queueing()
+
+        interval_list = decorated.currently_scheduled_in_seconds()
+
+        # At only three seconds, we expect this to be scheduled to the max.
+        self.assertEqual(len(interval_list), schedule_ahead)
+
+        try:
+            last_value = interval_list.pop(0)
+        except IndexError:
+            self.fail("We got an empty list of the current schedule.  That ain't right.")
+
+        while interval_list:
+            this_value = interval_list.pop(0)
+            difference = this_value-last_value
+            self.assertEqual(difference, 3L)
+            last_value = this_value
 
 
 class TaskScheduleTests(TestCase):
@@ -109,3 +139,4 @@ class TaskScheduleTests(TestCase):
         monthly = monthly_task(some_callable)
         monthly_delta = monthly.delta_until_run_time()
         self.assertEqual(monthly_delta, relativedelta(day=4, hour=14, minute=17))
+
