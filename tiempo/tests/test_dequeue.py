@@ -47,7 +47,7 @@ class TestTaskInQueue(TestCase):
         d = self.runner.cycle()  # Run the next task in line, which we hope to be the above.
 
         def assert_that_unblocker_ran(n):
-            unblocked_code = q.get() # The q will have pushed the random string.
+            unblocked_code = q.get()  # The q will have pushed the random string.
             self.assertEqual(unblocked_code, random_string)
 
         d.addCallback(assert_that_unblocker_ran)

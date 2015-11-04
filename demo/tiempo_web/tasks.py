@@ -9,7 +9,7 @@ def sleep_blocker(announcer):
 
     unlucky_number = random.choice(range(80, 160))
 
-    announcer.set_progress_increments(upper_bound)
+    announcer.set_progress_increments(upper_bound)  # TODO: Implement progress indicator.
 
     for n in range(0, upper_bound):
         announcer.report_progress(n)

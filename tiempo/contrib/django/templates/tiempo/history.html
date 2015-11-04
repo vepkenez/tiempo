@@ -67,9 +67,11 @@
                         <div flex="10">"[{result.codeWord}]" <strong>([{result.message}])</strong></div>
                         <div>[{result.finish_time| amDateFormat:'MM.DD.YYYY HH:mm:ss'}]</div>
                         <div class="errorText">[{result.result}]</div>
+                        <div>[{(result.result_detail|json).length}] details</div>
                         <div ng-if="result.showMore">
-                            <pre ng-repeat="detail in result.result_detail">[{detail}]</pre>
-                            </div>
+                            <pre ng-repeat="detail in result.result_detail|json track by $index">
+                                [{detail}]
+                            </pre>
                         </div>
                     </div>
                 </div>
@@ -140,9 +142,6 @@
                 var sock = new SockJS('/tiempo_communication/messages/');
 
                 sock.onopen = function(e) {
-                    sock.send(
-                        JSON.stringify({'hx_subscribe': 'history'})
-                    );
                     sock.send(
                         JSON.stringify({'hx_subscribe': 'results'})
                     );

@@ -7,7 +7,7 @@ from twisted.logger import Logger
 
 from constants import BUSY, IDLE
 from tiempo.conn import REDIS, subscribe_to_backend_notifications, hear_from_backend
-from tiempo.utils import namespace
+from tiempo.utils import namespace, utc_now
 from tiempo.work import announce_tasks_to_client
 
 logger = Logger()
@@ -16,19 +16,30 @@ ps = REDIS.pubsub()
 
 
 def cycle():
-    # This loop does four things:
+    # This loop does five things:
 
-    # Thing 1) Let the runners pick up any queued tasks.
+    # Thing 1) Harvest events that have come in from the backend.
+    events = glean_events_from_backend()
+    # Thing 2) Let the runners pick up any queued tasks.
     let_runners_pick_up_queued_tasks()
-    # Thing 2) Queue up new tasks.
-    queue_scheduled_tasks()
-    # Thing 3) Schedule new tasks for enqueing.
+    # Thing 3) Queue up new tasks.
+    queue_scheduled_tasks(events)
+    # Thing 4) Schedule new tasks for enqueing.
     schedule_tasks_for_queueing()
-
-    # Thing 4) Broadcast any new announcements to listeners.
-    broadcast_new_announcements_to_listeners()
+    # Thing 5) Broadcast any new announcements to listeners.
+    broadcast_new_announcements_to_listeners(events)
 
 looper = task.LoopingCall(cycle)
+
+
+def glean_events_from_backend():
+    try:
+        events = hear_from_backend()
+    except AttributeError, e:
+        if e.args[0] == "'NoneType' object has no attribute 'can_read'":
+            logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")
+        events = None
+    return events
 
 
 def let_runners_pick_up_queued_tasks():
@@ -45,8 +56,9 @@ def let_runners_pick_up_queued_tasks():
 
 
 def schedule_tasks_for_queueing():
-    pipe = REDIS.pipeline()  # TODO: Implement distrubted locking.
+    pipe = REDIS.pipeline()  # TODO: Implement distributed locking.
     for task in TIEMPO_REGISTRY.values():
+        # TODO: Does this belong in Trabajo?  With pipe as an optional argument?
         run_times = task.check_schedule()
 
         for run_time in run_times:
@@ -61,51 +73,49 @@ def schedule_tasks_for_queueing():
 
         pipe.execute()
 
-def queue_up_new_tasks():
+
+def queue_scheduled_tasks(backend_events):
+    # TODO: What happens if this is running on the same machine?
+    run_now = {}
     for task_string, task in TIEMPO_REGISTRY.items():
-        now = utc_now()
-        ### REPLACE with task.next_expiration_dt()
-        if task.force_interval:
-            expire_key = now + datetime.timedelta(
-                    seconds=task.force_interval
-            )
-        else:
-            expire_key = task_time_keys().get(task.get_schedule())
-        #########
+        run_now[task_string] = False
 
-        if expire_key:
-            stop_key_has_expired = REDIS.setnx(task.stop_key, 0)
+        for event in backend_events:
 
-            if stop_key_has_expired:
+            if event['type'] == 'psubscribe':
+                # ignore subscribe events.
+                continue
 
-                seconds_until_expiration = int(float((expire_key - now).total_seconds())) - 1
-                REDIS.expire(
-                    task.stop_key,
-                    seconds_until_expiration
-                )
+            # If this is a scheduled event and it has now expired....
+            if event['pattern'].split(':')[1] == 'expired' and event['data'].split(':')[1] == "scheduled":
+                data = event['data'].split(':')
+                # ...then it's time to run the corresponding task.
+                task_key_that_expired = data[2]
+                run_now[task_key_that_expired] = True
+                logger.info("Heard expiry %s." % data)
 
-                # OK, we're ready to queue up a new job for this task!
-                return task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
+        # We now know which jobs need to be run.  Run them if marked.
+        queued_jobs = {}
+        for candidate, go_flag in run_now.items():
+            if go_flag:
+                task = TIEMPO_REGISTRY[candidate]
+                queued_jobs[candidate] = task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
+            else:
+                queued_jobs[candidate] = False
 
 
-def broadcast_new_announcements_to_listeners():
-    try:
-        events = hear_from_backend()
-    except AttributeError, e:
-        if e.args[0] == "'NoneType' object has no attribute 'can_read'":
-            logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")
-            events = None
-
-    if events:
-        for event in events:
-            if not event['type'] == 'psubscribe':
-                key = event['channel'].split(':', 1)[1]
-                new_value = REDIS.hgetall(key)
-                channel_to_announce = key.split(':', 1)[0]
-                if new_value.has_key('jobUid'):
-                    hxdispatcher.send(channel_to_announce, {channel_to_announce: {new_value['jobUid']: new_value}})
-                else:
-                    hxdispatcher.send(channel_to_announce, {channel_to_announce: new_value})
+def broadcast_new_announcements_to_listeners(events):
+    for event in events:
+        if not event['type'] == 'psubscribe':
+            key = event['channel'].split(':', 1)[1]
+            if key == "expired":
+                continue # We aren't handling expired notifications here.
+            new_value = REDIS.hgetall(key)
+            channel_to_announce = key.split(':', 1)[0]
+            if new_value.has_key('jobUid'):
+                hxdispatcher.send(channel_to_announce, {channel_to_announce: {new_value['jobUid']: new_value}})
+            else:
+                hxdispatcher.send(channel_to_announce, {channel_to_announce: new_value})
 
 
 def start():
@@ -115,7 +125,7 @@ def start():
     logger.info("tiempo_loop start() called.")
 
     if not looper.running:
-        looper.start(1) #INTERVAL)
+        looper.start(1)  # TODO: Customize interval
         task.LoopingCall(announce_tasks_to_client).start(5)
     else:
         logger.warning("Tried to call tiempo_loop start() while the loop is already running.")

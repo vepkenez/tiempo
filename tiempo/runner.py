@@ -44,7 +44,7 @@ class Runner(object):
 
     def cycle(self):
         '''
-        If idle, find a job and run it.3
+        If idle, find a job and run it.
         '''
 
         # If we have a current Job, return BUSY and go no further.
@@ -123,11 +123,12 @@ class Runner(object):
         runner_dict.update({'return_value': str(return_value)})
 
         runner_dict.update({'result': self.announcer.results_brief})
-        runner_dict.update({'result_detail': self.announcer.results_detail})
+        runner_dict.update({'result_detail': json.dumps(self.announcer.results_detail)})
 
         ##
-        hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
+        # hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
         REDIS.hmset('results:%s' % self.current_job.uid, runner_dict)
+        # TODO: Add some kind of trim here so that results:* don't grow huge.
         ##
 
         return self.cleanup(return_value)
@@ -140,8 +141,10 @@ class Runner(object):
         runner_dict.update({'result': str(failure.value)})
         detail = runner_dict['result_detail'] = self.announcer.results_detail
         detail.append(str(failure.getTraceback()))
-        # REDIS.hset('results', self.current_job.uid, json.dumps(runner_dict))
-        hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
+        REDIS.hset('results:%s' % self.current_job.uid, runner_dict)
+
+        # TODO: Remove this, using only the backend push instead.
+        # hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
 
         return self.cleanup(failure)
 

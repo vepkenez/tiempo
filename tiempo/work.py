@@ -37,14 +37,14 @@ WORDS = open(word_file).read().splitlines()
 
 
 def announce_tasks_to_client():
-        '''
-        Push the list of tasks to the client.
-        '''
-        task_dict = {}
+    '''
+    Push the list of tasks to the client.
+    '''
+    task_dict = {}
 
-        for task in TIEMPO_REGISTRY.values():
-            task_dict[task.key] = task.serialize_to_dict()
-        hxdispatcher.send('all_tasks', {"tasks": task_dict})
+    for task in TIEMPO_REGISTRY.values():
+        task_dict[task.key] = task.serialize_to_dict()
+    hxdispatcher.send('all_tasks', {"tasks": task_dict})
 
 
 class Job(object):
@@ -483,7 +483,7 @@ class Trabajo(object):
             if self.force_interval:
                 seconds = self.force_interval
                 last_run = REDIS.get(namespace("last_run:%s" % self.uid))
-                if not last_run:
+                if not last_run:  # If we've never run before...
                     return datetime.timedelta(seconds=seconds)
                 else:
                     raise RuntimeError("Not implemented.")
@@ -557,7 +557,7 @@ class Trabajo(object):
 
             dt_of_next_run = self.datetime_of_subsequent_run(window_begin)
 
-            if dt_of_next_run:
+            if dt_of_next_run:  # TODO: When is this False?
                 if dt_of_next_run < window_end:
 
                     # This dt checks out.  Add it.
@@ -569,7 +569,7 @@ class Trabajo(object):
                 else:
                     break  # This dt is after the window_end.
             else:
-                break # There is no qualifying dt in this timeframe.
+                break  # There is no qualifying dt in this timeframe.  TODO: Test this.
         return run_times
 
     def currently_scheduled_keys(self):
@@ -595,7 +595,9 @@ class Trabajo(object):
         # If this task has a report handler, use it.  Otherwise, use a default if one is passed.
         report_handler = self.report_handler or default_report_handler
 
-        job = Job(self)
+        # TODO: Implement report handler
+
+        job = Job(task=self)
         return job
 
     def spawn_job_and_run_soon(self,
