@@ -137,6 +137,10 @@ class TaskScheduleTests(TestCase):
 
     def test_monthly_has_complete_delta(self):
         monthly = monthly_task(some_callable)
-        monthly_delta = monthly.delta_until_run_time()
-        self.assertEqual(monthly_delta, relativedelta(day=4, hour=14, minute=17))
+        monthly_delta = monthly.delta_until_run_time(self.check_from_time)
+
+        # Monthly is day 4, check_from_time is day 26.
+        # Since the day of our task has passed, we expect it to
+        # run next month.
+        self.assertEqual(monthly_delta, relativedelta(months=+1, day=4, hour=14, minute=17))
 
