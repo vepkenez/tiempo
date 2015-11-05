@@ -14,4 +14,4 @@ notifications:
 script: tox
 
 after_success:
-  - coveralls
+  - COVERALLS_REPO_TOKEN=abcdef1234569abdcef coveralls
