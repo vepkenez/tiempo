@@ -5,7 +5,8 @@ import json
 
 
 def completed_jobs():
-
+    """An imperative function. Takes no arguments, checks the pipeline for jobs, and returns an ordered dictionary of keys and jobs."""
+    print("completed_jobs called")
     keys = REDIS.keys('results*')
     pipe = REDIS.pipeline()
     for key in keys:

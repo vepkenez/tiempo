@@ -53,6 +53,7 @@ class Job(object):
     '''
 
     def __init__(self, task, reconstitute_from=None, report_handler=None):
+        print("Job instance initialized")
         self.task = task
 
         if reconstitute_from:
@@ -79,6 +80,7 @@ class Job(object):
         )
 
     def serialize_to_dict(self):
+        print("Job.serialize_to_dict called")
         d = {'uid': self.uid,
              'codeWord': self.code_word,
              'key': self.task.key,
@@ -183,7 +185,7 @@ class Job(object):
                                     })
 
     def start(self, error=None):
-
+        print("Job.start called")
         self.start_time = utc_now()
 
         logger.debug('Starting %s' % self.code_word)
@@ -204,6 +206,7 @@ starting at %(start)s"""%data
         self.announce('job_queue')
 
     def finish(self, error=None):
+        print("Job.finish called")
         try:
             logger.info('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
         except AttributeError, e:

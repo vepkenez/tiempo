@@ -16,6 +16,7 @@ ps = REDIS.pubsub()
 
 
 def cycle():
+    """An event loop for tiempo"""
     # This loop does five things:
 
     # Thing 1) Harvest events that have come in from the backend.
@@ -33,6 +34,7 @@ looper = task.LoopingCall(cycle)
 
 
 def glean_events_from_backend():
+    print("glean_events_from_backend called")
     try:
         events = hear_from_backend()
     except AttributeError, e:
@@ -43,6 +45,7 @@ def glean_events_from_backend():
 
 
 def let_runners_pick_up_queued_tasks():
+    print("let_runners_pick_up_queued_tasks called")
     for runner in all_runners():
 
         result = runner.cycle()
@@ -56,6 +59,7 @@ def let_runners_pick_up_queued_tasks():
 
 
 def schedule_tasks_for_queueing():
+    print("schedule_tasks_for_queueing called")
     pipe = REDIS.pipeline()  # TODO: Implement distributed locking.
     for task in TIEMPO_REGISTRY.values():
         # TODO: Does this belong in Trabajo?  With pipe as an optional argument?
@@ -75,6 +79,7 @@ def schedule_tasks_for_queueing():
 
 
 def queue_scheduled_tasks(backend_events):
+    print("queue_scheduled_tasks called")
     # TODO: What happens if this is running on the same machine?
     run_now = {}
     for task_string, task in TIEMPO_REGISTRY.items():
@@ -105,6 +110,7 @@ def queue_scheduled_tasks(backend_events):
 
 
 def broadcast_new_announcements_to_listeners(events):
+    print("broadcast_new_announcements_to_listeners")
     for event in events:
         if not event['type'] == 'psubscribe':
             key = event['channel'].split(':', 1)[1]
@@ -119,7 +125,7 @@ def broadcast_new_announcements_to_listeners(events):
 
 
 def start():
-
+    print("tiempo_loop start() called.")
     subscribe_to_backend_notifications()
 
     logger.info("tiempo_loop start() called.")

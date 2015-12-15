@@ -25,6 +25,7 @@ class Runner(object):
     finish_time = None
 
     def __init__(self, number, thread_group_list):
+        print ("Runner object instantiated")
         logger.info("Starting Runner %s for groups %s (%s)" % (number, thread_group_list, id(self)))
         for i in thread_group_list:
             if RUNNERS.has_key(i):
@@ -47,6 +48,7 @@ class Runner(object):
         If idle, find a job and run it.
         '''
 
+        print("Runner.cycle called")
         # If we have a current Job, return BUSY and go no further.
         if self.current_job:
             logger.debug("Worker %s is busy with %s (%s / %s)" % (
@@ -72,6 +74,7 @@ class Runner(object):
             return IDLE
 
     def seek_job(self):
+        print("Runner.seek_job called")
         for g in self.task_groups:
 
             logger.debug('%r checking for a Job in group %r' % (self, g))
@@ -92,6 +95,7 @@ class Runner(object):
         '''
         Run the current job's task.
         '''
+        print("Runner.run called")
         self.start_time = utc_now()
         try:
             logger.debug('%s running task: %s' % (self, self.current_job.code_word))
@@ -109,6 +113,8 @@ class Runner(object):
         return task.run(runner=self)
 
     def cleanup(self, result):
+        """Takes a Runner instance and sanitizes it. !Destructive Function!"""
+        print("Runner.cleanup called")
         self.current_job.finish()
 
         self.current_job = self.start_time = self.finish_time = None
@@ -118,6 +124,7 @@ class Runner(object):
         return  # And go back to cycling.
 
     def handle_success(self, return_value):
+        print("Runner.handle_success called")
         self.finish_time = utc_now()
         runner_dict = self.serialize_to_dict()
         runner_dict.update({'return_value': str(return_value)})
@@ -134,6 +141,7 @@ class Runner(object):
         return self.cleanup(return_value)
 
     def handle_error(self, failure):
+        print("Runner.handle_error called")
         self.finish_time = utc_now()
         self.error_state = True
         logger.info(failure.getBriefTraceback())  # TODO: What level do we want this to be?
@@ -149,6 +157,7 @@ class Runner(object):
         return self.cleanup(failure)
 
     def serialize_to_dict(self, alert=False):
+        print("Runner.serialize_to_dict called")
         if self.current_job:
             code_word = self.current_job.code_word
             job_uid = self.current_job.uid
@@ -184,6 +193,7 @@ class Runner(object):
         return d
 
     def announce(self, channel, alert=False):
+        print("Runner.announce called")
         hxdispatcher.send(channel,
                           {
                               'runners':
@@ -194,6 +204,7 @@ class Runner(object):
                           )
 
     def shut_down(self):
+        print("Runner.shut_down called")
         for runner_list in RUNNERS.values():
             if self in runner_list:
                 runner_list.remove(self)
