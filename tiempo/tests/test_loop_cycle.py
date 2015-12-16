@@ -103,8 +103,8 @@ class ScheduleExpiryTests(TestCase):
 
         # schedule again
         schedule_tasks_for_queueing()
-        queued = periodic.currently_scheduled_keys()
-
+        keys = periodic.currently_scheduled_keys()
+        print len(queued)
         # there should be no new tasks scheduled
         self.assertEqual(len(queued), 3)
 
