@@ -70,8 +70,9 @@ def schedule_tasks_for_queueing():
                 pipe.set(key, 0)
                 pipe.expireat(key, unix_time)
 
-            # After loop, set final time.
-            pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
+            if run_times:
+                # After loop, set final time.
+                pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
 
             pipe.execute()
         schedule_lock.release()
