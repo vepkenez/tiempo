@@ -2,7 +2,7 @@ from redlock import RedLockFactory
 
 
 lock_factory = RedLockFactory(connection_details=[
-        {host='localhost', port=6379}
+    {host: 'localhost', port: 6379}
     ]
 )
 
