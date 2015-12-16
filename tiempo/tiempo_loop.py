@@ -9,6 +9,7 @@ from constants import BUSY, IDLE
 from tiempo.conn import REDIS, subscribe_to_backend_notifications, hear_from_backend
 from tiempo.utils import namespace, utc_now
 from tiempo.work import announce_tasks_to_client
+from tiempo.locks import schedule_lock
 
 logger = Logger()
 default_report_handler = None
@@ -56,22 +57,24 @@ def let_runners_pick_up_queued_tasks():
 
 
 def schedule_tasks_for_queueing():
-    pipe = REDIS.pipeline()  # TODO: Implement distributed locking.
-    for task in TIEMPO_REGISTRY.values():
-        # TODO: Does this belong in Trabajo?  With pipe as an optional argument?
-        run_times = task.check_schedule()
+    if schedule_lock.acquire():
+        pipe = REDIS.pipeline() 
+        for task in TIEMPO_REGISTRY.values():
+            # TODO: Does this belong in Trabajo?  With pipe as an optional argument?
+            run_times = task.check_schedule()
 
-        for run_time in run_times:
-            # TODO: There's probably a better namespace for this - maybe a UUID to assigned to the job that eventually gets spawned.
-            unix_time = calendar.timegm(run_time.timetuple())
-            key = namespace('scheduled:%s:%s' % (task.key, unix_time))
-            pipe.set(key, 0)
-            pipe.expireat(key, unix_time)
+            for run_time in run_times:
+                # TODO: There's probably a better namespace for this - maybe a UUID to assigned to the job that eventually gets spawned.
+                unix_time = calendar.timegm(run_time.timetuple())
+                key = namespace('scheduled:%s:%s' % (task.key, unix_time))
+                pipe.set(key, 0)
+                pipe.expireat(key, unix_time)
 
-        # After loop, set final time.
-        pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
+            # After loop, set final time.
+            pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
 
-        pipe.execute()
+            pipe.execute()
+        schedule_lock.release()
 
 
 def queue_scheduled_tasks(backend_events):
