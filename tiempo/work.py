@@ -47,6 +47,10 @@ def announce_tasks_to_client():
     hxdispatcher.send('all_tasks', {"tasks": task_dict})
 
 
+def report_handler(job):
+    print job
+    
+
 class Job(object):
     '''
     A task running right now.
@@ -598,6 +602,7 @@ class Trabajo(object):
         # TODO: Implement report handler
 
         job = Job(task=self)
+        
         return job
 
     def spawn_job_and_run_soon(self,
