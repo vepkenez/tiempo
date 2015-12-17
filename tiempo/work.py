@@ -543,7 +543,6 @@ class Trabajo(object):
 
         if not next_time > search_start_time:
         # sometimes we will have a situation where
-
         # we have something like 2015-12-5 23:05:00
         # and we add an hour to it and it becomes 2015-12-5 00:05:00
 
@@ -607,6 +606,10 @@ class Trabajo(object):
 
         offset = relativedelta()
         if not self.force_interval:
+            # getting the next run with a datetime that matches
+            # the next run will return the same value
+            # so we need to bump it up by our smallest interval which
+            # is currenly one minute
             offset = relativedelta(minutes=1)
         while next_time and next_time > start and next_time < end and len(out) < cutoff:
             out.append(next_time)
