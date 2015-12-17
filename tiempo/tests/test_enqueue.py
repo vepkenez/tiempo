@@ -8,7 +8,8 @@ from tiempo.utils.premade_decorators import hourly_task, daily_task
 class TaskQueueTests(TestCase):
 
     def test_task_is_not_added_to_queue_if_not_time_yet(self):
-        task = daily_task(some_callable)
+        task = daily_task(some_callable)# this runs at 1:00am
+
         window_begin = datetime.datetime(2006, 4, 26, 12, 30, 45)
         window_end = window_begin + datetime.timedelta(hours=3)
 
@@ -17,6 +18,7 @@ class TaskQueueTests(TestCase):
         self.assertEqual(queued, [])
 
     def test_hourly_task_is_scheduled_three_times_in_three_hours(self):
+        # this runs at :30 minutes past the hour
         task = hourly_task(some_callable)
 
         window_begin = utc_now()

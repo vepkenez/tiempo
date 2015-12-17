@@ -120,6 +120,17 @@ class TaskScheduleTests(TestCase):
         delta = task.delta_until_run_time(self.check_from_time)
         self.assertEqual(delta, relativedelta(minutes=+1))
 
+    def test_for_actual_correct_execution_time(self):
+        """
+            if right now is 12:30 and I schedule a task to run every hour
+            on the 31st minute, it should run 60 seconds from now
+        """
+        task = Trabajo(periodic=True, minute=31)(some_callable)
+        delta = task.delta_until_run_time(self.check_from_time)
+        self.assertEqual(delta.seconds, 60)
+
+        # self.assertEqual(delta, relativedelta(minute=40))
+
     '''
     Next two tests:
     Our test time is at 30 after the hour, so a task scheduled for 40
@@ -128,12 +139,12 @@ class TaskScheduleTests(TestCase):
     def test_hourly_runs_this_hour(self):
         task = Trabajo(periodic=True, minute=40)(some_callable)
         delta = task.delta_until_run_time(self.check_from_time)
-        self.assertEqual(delta, relativedelta(minute=40))
+        self.assertEqual(delta, relativedelta(minute=10))
 
     def test_hourly_runs_next_hour(self):
         task = Trabajo(periodic=True, minute=20)(some_callable)
         delta = task.delta_until_run_time(self.check_from_time)
-        self.assertEqual(delta, relativedelta(hours=+1, minute=20))
+        self.assertEqual(delta.seconds, relativedelta(minute=50).minutes * 60)
 
     def test_monthly_has_complete_delta(self):
         monthly = monthly_task(some_callable)
@@ -143,4 +154,99 @@ class TaskScheduleTests(TestCase):
         # Since the day of our task has passed, we expect it to
         # run next month.
         self.assertEqual(monthly_delta, relativedelta(months=+1, day=4, hour=14, minute=17))
+
+    def test_unit_test_get_next_datetime_minutes(self):
+
+        for task_minutes, check_minutes in [
+                (20, 10),  # 10 minutes
+                (10, 20),  # 50 minutes
+                (10, 59),  # 49 minutes
+                (59, 10),  # 11 minutes
+                (30, 30),  # 0 minutes
+                (29, 30),  # 1 minutes
+                (30, 29)  # 59 minutes
+            ]:
+
+            sometask = Trabajo(periodic=True, minute=task_minutes)(some_callable)
+            date_time=datetime(2006, 4, 26, 12, check_minutes, 0)
+
+            # this is the next datetime this task should run.
+            next_datetime = sometask.get_next_time_for_periodic_task(date_time)
+            seconds_till_next_date_time = (next_datetime-date_time).seconds
+
+            # figure out how many seconds from now this task should run
+            # based on our current task_minutes and check_minutes
+            # accounts for negative time deltas
+            # ie.  10 - 20 = 50 minutes (in seconds)
+            seconds_from_now_task_should_run = (3600 + relativedelta(
+                minutes=task_minutes-check_minutes).minutes * 60) % 3600
+
+            self.assertEqual(
+                seconds_till_next_date_time,
+                seconds_from_now_task_should_run,
+                (seconds_till_next_date_time,
+                seconds_from_now_task_should_run, task_minutes, check_minutes,)
+            )
+
+    def test_unit_test_get_next_datetime_hours(self):
+
+        for task_hours, check_hours in [
+                (20, 10),  # 10 hours
+                (10, 20),  # 14 hours
+                (12, 12),  # 0 hours
+                (12, 1),  # 23 hours
+                (1, 12)  # 1 hour
+            ]:
+
+            sometask = Trabajo(periodic=True, hour=task_hours)(some_callable)
+            date_time=datetime(2006, 4, 26, check_hours, 0, 0)
+
+            # this is the next datetime this task should run.
+            next_datetime = sometask.get_next_time_for_periodic_task(date_time)
+            seconds_till_next_date_time = (next_datetime-date_time).seconds
+
+            # figure out how many seconds from now this task should run
+            # based on our current task_hours and check_hours
+            # accounts for negative time deltas
+            # ie.  10 - 20 = 14 hours (in seconds)
+            seconds_from_now_task_should_run = (86400 + (relativedelta(
+                hours=task_hours-check_hours).hours * 60 * 60)) % 86400
+
+            self.assertEqual(
+                seconds_till_next_date_time,
+                seconds_from_now_task_should_run,
+                (seconds_till_next_date_time,
+                seconds_from_now_task_should_run, task_hours, check_hours,)
+            )
+
+    # def test_unit_test_get_next_datetime_days(self):
+
+    #     for task_days, check_days in [
+    #             (20, 10),  # 10 days
+    #             (10, 20),  # depends on the month but about 20?!
+    #             (12, 12),  # 0 days
+    #             (28, 1),  # 3 days or so?
+    #             (1, 12)  # 1 hour
+    #         ]:
+
+    #         sometask = Trabajo(periodic=True, hour=task_hours)(some_callable)
+    #         date_time=datetime(2006, 4, 26, check_hours, 0, 45)
+
+    #         # this is the next datetime this task should run.
+    #         next_datetime = sometask.get_next_time_for_periodic_task(date_time)
+    #         seconds_till_next_date_time = (next_datetime-date_time).seconds
+
+    #         # figure out how many seconds from now this task should run
+    #         # based on our current task_hours and check_hours
+    #         # accounts for negative time deltas
+    #         # ie.  10 - 20 = 14 hours (in seconds)
+    #         seconds_from_now_task_should_run = (86400 + (relativedelta(
+    #             hours=task_hours-check_hours).hours * 60 * 60)) % 86400
+
+    #         self.assertEqual(
+    #             seconds_till_next_date_time,
+    #             seconds_from_now_task_should_run,
+    #             (seconds_till_next_date_time,
+    #             seconds_from_now_task_should_run, task_hours, check_hours,)
+    #         )
 

@@ -96,17 +96,15 @@ class ScheduleExpiryTests(TestCase):
         first_key = queued[0]
         last_key = queued[-1]
 
-        self.assertEqual(len(queued), 3)
+        self.assertEqual(len(periodic.currently_scheduled_keys()), 3)
 
         # wait 2 seconds
         time.sleep(2)
 
         # schedule again
         schedule_tasks_for_queueing()
-        queued = periodic.currently_scheduled_keys()
-
         # there should be no new tasks scheduled
-        self.assertEqual(len(queued), 3)
+        self.assertEqual(len(periodic.currently_scheduled_keys()), 3)
 
         # the keys should still be the same
         self.assertEqual(queued[0], first_key)

@@ -276,7 +276,9 @@ class Trabajo(object):
     '''
 
     def __repr__(self):
-        return self.key
+        return self.key + ' - ' + ':'.join(
+            [str(getattr(self, t) or '*') for t in ['day', 'minute', 'hour']]
+        )
 
     def __init__(self,
                  report_to=None,
@@ -292,6 +294,8 @@ class Trabajo(object):
         self.day = None
         self.hour = None
         self.minute = None
+        self.second = 0
+
         self.periodic = False
         self.force_interval = None
         self.current_job = None  # TODO: Push this knowledge down into the backend
@@ -457,13 +461,6 @@ class Trabajo(object):
 
         return expiration_dt
 
-    def runs_every_minute(self):
-        '''
-        A convenience method to determine whether a task
-        runs once per minute on schedule.
-        '''
-        return self.periodic and not(self.force_interval or self.minute or self.hour or self.day)
-
     def delta_until_run_time(self, dt=None):
         '''
         Takes a datetime, which defaults to utc_now().
@@ -486,42 +483,54 @@ class Trabajo(object):
                 if not last_run:  # If we've never run before...
                     return datetime.timedelta(seconds=seconds)
                 else:
+                    #  i would think we would
+                    #  add the interval time to
+                    #  the last run time here?
                     raise RuntimeError("Not implemented.")
 
-            # If this task runs every minute, we know that we need to simply add a minute to the dt to get the next runtime.
-            if self.runs_every_minute():
-                return relativedelta(minutes=+1)
+            return self.get_next_time_for_periodic_task(dt) - dt
 
-            r = relativedelta()
+    def get_next_time_for_periodic_task(self, search_start_time):
+        """
+            returns the next date after the date specified that
+            meets the conditions needed to run this task
 
-            next_hour = False
-            next_day = False
+        """
+        next_time = search_start_time
+        for period, offset in [
+            ('second', 'minute'),
+            ('minute', 'hour'),
+            ('hour', 'day'),
+            ('day', 'month')
+        ]:
+            if getattr(self, period, None) is not None:
 
-            if self.minute:
-                r += relativedelta(minute=self.minute)
+                offset_data = {
+                    period: int(getattr(self, period))
+                }
 
-                # Read as "If the current minute is already past the minute of run time, we do this next hour."
-                next_hour = dt.minute >= self.minute
+                # if our search time occurs after the specified unit period
+                # of the task, we need to increment the
+                # higher order period by 1
 
-            if self.hour:
-                r += relativedelta(hour=self.hour)
+                if getattr(search_start_time, period) > getattr(self, period):
 
-                # Same as 'next hour' above, but for day.
-                if dt.hour >= self.hour:
-                    next_day = True
-            elif next_hour:
-                r += relativedelta(hours=+1)
+                    offset_time = search_start_time + relativedelta(
+                        # becomes like:  relativedelta(months=1)
+                        **{offset+'s': 1}
+                    )
 
-            if self.day:
-                r += relativedelta(day=self.day)
-                if dt.day >= self.day:
-                    r += relativedelta(months=+1)
-            elif next_day:
-                r += relativedelta(days=+1)
+                    offset_data.update(
+                        {offset: getattr((offset_time), offset)}
+                    )
 
-            return r
-        else:
-            return None
+                # now, replace our time's data with the correclty offset
+                # values
+                next_time = next_time.replace(
+                    **offset_data
+                )
+
+        return next_time
 
     def datetime_of_subsequent_run(self, dt=None):
         """
@@ -531,10 +540,10 @@ class Trabajo(object):
 
         Otherwise, returns None.
         """
-        dt = dt or utc_now()
+        dt = dt or utc_now().replace(microsecond=0)
         r = self.delta_until_run_time(dt)
         if r is not None:
-            return dt + r
+            return (dt + r).replace(microsecond=0)
 
     def check_schedule(self, window_begin=None, window_end=None):
         '''
@@ -546,31 +555,29 @@ class Trabajo(object):
 
         Returns a list of datetime objects at which scheduling this task is appropriate.
         '''
-        window_begin = window_begin or utc_now().replace(microsecond=0)
+
+        if window_begin:
+            window_begin.replace(microsecond=0)
+        else:
+            window_begin= utc_now().replace(microsecond=0)
+
         window_end = window_end or window_begin + datetime.timedelta(minutes=SCHEDULE_AHEAD_MINUTES)
 
-        run_times = []
+        return self.get_times_for_window(window_begin, window_end)
 
-        while True:
-            if len(run_times) >= self.max_schedule_ahead:
-                break
+    def get_times_for_window(self, start, end, max_times=None):
 
-            dt_of_next_run = self.datetime_of_subsequent_run(window_begin)
+        print 'self:',self, '----- start:',start, 'end:',end
+        cutoff = max_times or MAX_SCHEDULE_AHEAD_JOBS
 
-            if dt_of_next_run:  # TODO: When is this False?
-                if dt_of_next_run < window_end:
+        out = []
+        d = self.datetime_of_subsequent_run(start)
+        while d and d < end and len(out) < cutoff:
+            out.append(d)
+            print d
+            d = self.datetime_of_subsequent_run(d)
 
-                    # This dt checks out.  Add it.
-                    run_times.append(dt_of_next_run)
-
-                    # To find a subsequent run, start searching at this time.
-                    window_begin = dt_of_next_run
-
-                else:
-                    break  # This dt is after the window_end.
-            else:
-                break  # There is no qualifying dt in this timeframe.  TODO: Test this.
-        return run_times
+        return out
 
     def currently_scheduled_keys(self):
         '''
