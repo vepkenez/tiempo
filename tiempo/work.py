@@ -498,13 +498,20 @@ class Trabajo(object):
             meets the conditions needed to run this task
 
         """
-        next_time = search_start_time
-        for period, offset in [
+
+        period_offsets = [
             ('second', 'minute'),
             ('minute', 'hour'),
             ('hour', 'day'),
-            ('day', 'month')
-        ]:
+            ('day', 'month'),
+            ('month', 'year')
+        ]
+
+        next_time = search_start_time
+        next_index = 1
+        for index, data in enumerate(period_offsets):
+            period, offset = data
+
             if getattr(self, period, None) is not None:
 
                 offset_data = {
@@ -526,11 +533,25 @@ class Trabajo(object):
                         {offset: getattr((offset_time), offset)}
                     )
 
-                # now, replace our time's data with the correclty offset
+                # now, replace our time's data with the correctly offset
                 # values
                 next_time = next_time.replace(
                     **offset_data
                 )
+
+                next_index = index + 1
+
+        if not next_time > search_start_time:
+            try:
+                period, offset = period_offsets[next_index]
+            except IndexError:
+                return None
+
+            offset_time = next_time + relativedelta(
+                # becomes like:  relativedelta(months=1)
+                **{offset+'s': 1}
+            )
+            return offset_time
 
         return next_time
 
@@ -569,14 +590,20 @@ class Trabajo(object):
 
     def get_times_for_window(self, start, end, max_times=None):
 
-        # print 'self:',self, '----- start:', start, 'end:',end
-        cutoff = max_times or MAX_SCHEDULE_AHEAD_JOBS
+        cutoff = max_times or self.max_schedule_ahead or MAX_SCHEDULE_AHEAD_JOBS
 
         out = []
-        d = self.datetime_of_subsequent_run(start)
-        while d and d < end and len(out) < cutoff:
-            out.append(d)
-            d = self.datetime_of_subsequent_run(d+ relativedelta(minutes=1))
+        next_time = last_time = self.datetime_of_subsequent_run(start)
+
+        offset = relativedelta()
+        if not self.force_interval:
+            offset = relativedelta(minutes=1)
+        while next_time and next_time > start and next_time < end and len(out) < cutoff:
+            out.append(next_time)
+            next_time = self.datetime_of_subsequent_run(next_time + offset)
+            if next_time == last_time:
+                break
+            last_time = next_time
 
         return out
 

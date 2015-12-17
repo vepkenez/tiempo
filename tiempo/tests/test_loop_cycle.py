@@ -85,7 +85,7 @@ class ScheduleExpiryTests(TestCase):
 
         periodic = Trabajo(
             periodic=True,
-            minute=window_begin.minute+3
+            minute=(window_begin.minute+3)%60
         )(some_callable)
 
         queued = periodic.currently_scheduled_keys()

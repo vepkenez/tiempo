@@ -69,7 +69,6 @@ def schedule_tasks_for_queueing():
                 key = namespace('scheduled:%s:%s' % (task.key, unix_time))
                 pipe.set(key, 0)
                 pipe.expireat(key, unix_time)
-
             if run_times:
                 # After loop, set final time.
                 pipe.set(namespace('lattermost_run_time:%s' % task.key), run_time.isoformat())
