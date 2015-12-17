@@ -5,6 +5,10 @@ import json
 
 
 def completed_jobs():
+    """
+    Takes no arguments, gets keys from redis, creates a pipeline and runs jobs,
+    and returns an ordered dictionary of keys and jobs.
+    """
 
     keys = REDIS.keys('results*')
     pipe = REDIS.pipeline()

@@ -17,6 +17,7 @@ ps = REDIS.pubsub()
 
 
 def cycle():
+    """This function runs in the event loop for tiempo"""
     # This loop does five things:
 
     # Thing 1) Harvest events that have come in from the backend.
@@ -34,6 +35,7 @@ looper = task.LoopingCall(cycle)
 
 
 def glean_events_from_backend():
+    
     try:
         events = hear_from_backend()
     except AttributeError, e:
@@ -79,6 +81,7 @@ def schedule_tasks_for_queueing():
 
 
 def queue_scheduled_tasks(backend_events):
+
     # TODO: What happens if this is running on the same machine?
     run_now = {}
     for task_string, task in TIEMPO_REGISTRY.items():
@@ -109,6 +112,7 @@ def queue_scheduled_tasks(backend_events):
 
 
 def broadcast_new_announcements_to_listeners(events):
+
     for event in events:
         if not event['type'] == 'psubscribe':
             key = event['channel'].split(':', 1)[1]

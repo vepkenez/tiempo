@@ -57,6 +57,7 @@ class Job(object):
     '''
 
     def __init__(self, task, reconstitute_from=None, report_handler=None):
+
         self.task = task
 
         if reconstitute_from:
@@ -83,6 +84,7 @@ class Job(object):
         )
 
     def serialize_to_dict(self):
+
         d = {'uid': self.uid,
              'codeWord': self.code_word,
              'key': self.task.key,
@@ -208,6 +210,7 @@ starting at %(start)s"""%data
         self.announce('job_queue')
 
     def finish(self, error=None):
+
         try:
             logger.info('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
         except AttributeError, e:
