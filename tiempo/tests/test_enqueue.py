@@ -12,7 +12,7 @@ class TaskQueueTests(TestCase):
         task = daily_task(some_callable)
 
         window_begin = datetime.datetime(2006, 4, 26, 12, 30, 45)
-        window_end = window_begin + datetime.timedelta(hours=1)
+        window_end = window_begin + datetime.timedelta(hours=3)
 
         # Since our task runs at the first hour, we expect it not to be scheduled in this window.
         queued = task.check_schedule(window_begin, window_end)
