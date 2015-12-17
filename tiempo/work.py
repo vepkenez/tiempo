@@ -72,6 +72,7 @@ class Job(object):
             self.code_word = task.code_word
             self.status = 'waiting'
             self.enqueued = False
+            self.freeze(False)
 
         self.announcer = Announcer()
 
@@ -83,19 +84,7 @@ class Job(object):
             self.task.uid
         )
 
-    def serialize_to_dict(self):
-
-        d = {'uid': self.uid,
-             'codeWord': self.code_word,
-             'key': self.task.key,
-             'enqueued': self.enqueued,
-             'status': self.status,
-             'taskUid': self.task.uid,
-             'group': self.task.group,  # TODO: Maybe do this client side.
-             }
-        return d
-
-    def _freeze(self, *args, **kwargs):
+    def freeze(self, frozen=True, *args, **kwargs):
 
         """
         creates a 'data' object which will be serialized and pushed into redis
@@ -115,11 +104,11 @@ class Job(object):
             'uid': self.uid,
             'codeWord': self.code_word,
         }
-        self.frozen = True
+        self.frozen = frozen
 
         return self.data
 
-    def _enqueue(self, queue_name):
+    def enqueue(self, queue_name=None):
         if not self.frozen:
             raise ValueError(
                 'need to freeze this task before enqueuing'
@@ -166,8 +155,8 @@ class Job(object):
 
         queue_name = job_list or self.task.group_key
 
-        self._freeze(*args, **kwargs)
-        self._enqueue(queue_name)
+        self.freeze(*args, **kwargs)
+        self.enqueue(queue_name)
         return self
 
     def now(self, *args, **kwargs):
@@ -185,7 +174,7 @@ class Job(object):
 
     def announce(self, channel):
         hxdispatcher.send(channel, {'jobs':
-                                        {self.uid: self.serialize_to_dict()}
+            {'self.uid': self.uid}
                                     })
 
     def start(self, error=None):
@@ -227,7 +216,7 @@ starting at %(start)s"""%data
 
         pipe = REDIS.pipeline()
         pipe.zadd(RECENT_KEY, self.start_time.strftime('%s'), task_key)
-        pipe.set(self.uid, self.serialize_to_dict())
+        pipe.set(self.uid, self.data)
         pipe.expire(self.uid, expire_time)
         pipe.execute()
         ### From old CaptureStdOut.finished()
