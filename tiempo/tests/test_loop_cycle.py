@@ -61,7 +61,8 @@ class ScheduleExpiryTests(TestCase):
 
         self.assertEqual(len(queued), 100)
 
-        # wait 2 seconds
+        # wait 1 second so... any time values that would be generated
+        # on subsequent scheduling iterations would be different
         time.sleep(1)
 
         # schedule again
@@ -98,7 +99,8 @@ class ScheduleExpiryTests(TestCase):
 
         self.assertEqual(len(periodic.currently_scheduled_keys()), 3)
 
-        # wait 2 seconds
+        # wait 2 seconds so... any time values that would be generated
+        # on subsequent scheduling iterations would be different by 2 seconds
         time.sleep(2)
 
         # schedule again
