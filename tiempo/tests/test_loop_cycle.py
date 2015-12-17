@@ -62,7 +62,7 @@ class ScheduleExpiryTests(TestCase):
         self.assertEqual(len(queued), 100)
 
         # wait 2 seconds
-        time.sleep(2)
+        time.sleep(1)
 
         # schedule again
         schedule_tasks_for_queueing()
