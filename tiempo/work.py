@@ -542,6 +542,16 @@ class Trabajo(object):
                 next_index = index + 1
 
         if not next_time > search_start_time:
+        # sometimes we will have a situation where
+
+        # we have something like 2015-12-5 23:05:00
+        # and we add an hour to it and it becomes 2015-12-5 00:05:00
+
+        # in that case we need to add an increment to the NEXT unit
+        # so in this case we would return 2015-12-6 00:05:00
+
+        # TODO: maybe there is a more elegant way to do this.
+
             try:
                 period, offset = period_offsets[next_index]
             except IndexError:
