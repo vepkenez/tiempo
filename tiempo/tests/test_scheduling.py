@@ -1,7 +1,7 @@
 import json
 import uuid
 from tiempo import TIEMPO_REGISTRY, tiempo_loop
-from datetime import datetime
+from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 
 from twisted.trial.unittest import TestCase
@@ -154,6 +154,19 @@ class TaskScheduleTests(TestCase):
         # Since the day of our task has passed, we expect it to
         # run next month.
         self.assertEqual(monthly_delta, relativedelta(months=+1, day=4, hour=14, minute=17))
+
+
+    def test_unit_task_get_times_for_window(self):
+        # task that runs on the 5th minute of every hour
+        sometask = Trabajo(periodic=True, minute=5)(some_callable)
+
+        window_begin = datetime(2006, 4, 26, 12, 30, 45)
+        window_end = window_begin + timedelta(hours=1)
+        times = sometask.get_times_for_window(window_begin, window_end)
+
+        self.assertEqual(len(times), 1)
+        self.assertEqual(times[0], window_begin.replace(hour=13, minute=5, second=0))
+
 
     def test_unit_test_get_next_datetime_minutes(self):
 

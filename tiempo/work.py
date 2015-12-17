@@ -488,6 +488,8 @@ class Trabajo(object):
                     #  the last run time here?
                     raise RuntimeError("Not implemented.")
 
+            # create a delta by getting the difference between
+            # now and the next time this tasks should run
             return self.get_next_time_for_periodic_task(dt) - dt
 
     def get_next_time_for_periodic_task(self, search_start_time):
@@ -567,15 +569,14 @@ class Trabajo(object):
 
     def get_times_for_window(self, start, end, max_times=None):
 
-        print 'self:',self, '----- start:',start, 'end:',end
+        # print 'self:',self, '----- start:', start, 'end:',end
         cutoff = max_times or MAX_SCHEDULE_AHEAD_JOBS
 
         out = []
         d = self.datetime_of_subsequent_run(start)
         while d and d < end and len(out) < cutoff:
             out.append(d)
-            print d
-            d = self.datetime_of_subsequent_run(d)
+            d = self.datetime_of_subsequent_run(d+ relativedelta(minutes=1))
 
         return out
 
