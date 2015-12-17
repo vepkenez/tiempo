@@ -84,7 +84,7 @@ class Job(object):
             self.task.uid
         )
 
-    def freeze(self, frozen=True, *args, **kwargs):
+    def freeze(self, make_frozen=True, *args, **kwargs):
 
         """
         creates a 'data' object which will be serialized and pushed into redis
@@ -104,7 +104,7 @@ class Job(object):
             'uid': self.uid,
             'codeWord': self.code_word,
         }
-        self.frozen = frozen
+        self.frozen = make_frozen
 
         return self.data
 

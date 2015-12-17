@@ -25,5 +25,5 @@ class JobReportingTests(TestCase):
         self.assertIsInstance(dictionary, dict)
         uid = dictionary['uid']
         self.assertIsInstance(uid, str)
-        dictionary = self.simple_job.freeze(False)
+        dictionary = self.simple_job.freeze(make_frozen=False)
         self.assertRaises(ValueError, f=self.simple_job.enqueue)
