@@ -15,7 +15,7 @@ Then to test this shit out just run:
 ```bash
 python demo/run_demo.py
 ```
-Point your browser to 127.0.0.1/tiempo_kiosk
+Point your browser to 127.0.0.1:4050/tiempo_kiosk
 
 #### To use with Django/Hendrix
 

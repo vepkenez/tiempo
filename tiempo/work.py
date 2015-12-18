@@ -84,6 +84,17 @@ class Job(object):
             self.task.uid
         )
 
+    def serialize_to_dict(self):
+        d = {'uid': self.uid,
+             'codeWord': self.code_word,
+             'key': self.task.key,
+             'enqueued': self.enqueued,
+             'status': self.status,
+             'taskUid': self.task.uid,
+             'group': self.task.group,  # TODO: Maybe do this client side.
+             }
+        return d
+
     def freeze(self, make_frozen=True, *args, **kwargs):
 
         """
@@ -103,6 +114,8 @@ class Job(object):
             'schedule': self.task.get_schedule(),
             'uid': self.uid,
             'codeWord': self.code_word,
+            'key': self.task.key,
+            'enqueued': self.enqueued,
         }
         self.frozen = make_frozen
 
@@ -174,7 +187,7 @@ class Job(object):
 
     def announce(self, channel):
         hxdispatcher.send(channel, {'jobs':
-            {'self.uid': self.uid}
+            {self.uid: self.serialize_to_dict()}
                                     })
 
     def start(self, error=None):
