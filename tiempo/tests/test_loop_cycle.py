@@ -61,8 +61,9 @@ class ScheduleExpiryTests(TestCase):
 
         self.assertEqual(len(queued), 100)
 
-        # wait 2 seconds
-        time.sleep(2)
+        # wait 1 second so... any time values that would be generated
+        # on subsequent scheduling iterations would be different
+        time.sleep(1)
 
         # schedule again
         schedule_tasks_for_queueing()
@@ -85,7 +86,7 @@ class ScheduleExpiryTests(TestCase):
 
         periodic = Trabajo(
             periodic=True,
-            minute=window_begin.minute+3
+            minute=(window_begin.minute+3)%60
         )(some_callable)
 
         queued = periodic.currently_scheduled_keys()
@@ -96,16 +97,16 @@ class ScheduleExpiryTests(TestCase):
         first_key = queued[0]
         last_key = queued[-1]
 
-        self.assertEqual(len(queued), 3)
+        self.assertEqual(len(periodic.currently_scheduled_keys()), 3)
 
-        # wait 2 seconds
+        # wait 2 seconds so... any time values that would be generated
+        # on subsequent scheduling iterations would be different by 2 seconds
         time.sleep(2)
 
         # schedule again
         schedule_tasks_for_queueing()
-        queued = periodic.currently_scheduled_keys()
         # there should be no new tasks scheduled
-        self.assertEqual(len(queued), 3)
+        self.assertEqual(len(periodic.currently_scheduled_keys()), 3)
 
         # the keys should still be the same
         self.assertEqual(queued[0], first_key)
