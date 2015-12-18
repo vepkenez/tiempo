@@ -31,6 +31,7 @@ import json
 import random
 from twisted.logger import Logger
 logger = Logger()
+from tiempo.locks import finish_pipe_lock
 
 word_file = "/usr/share/dict/words"
 WORDS = open(word_file).read().splitlines()
@@ -227,11 +228,13 @@ starting at %(start)s"""%data
         expire_time = int(((self.start_time + relativedelta(
             days=RESULT_LIFESPAN)) - self.start_time).total_seconds())
 
+        finish_pipe_lock.acquire()
         pipe = REDIS.pipeline()
         pipe.zadd(RECENT_KEY, self.start_time.strftime('%s'), task_key)
         pipe.set(self.uid, self.data)
         pipe.expire(self.uid, expire_time)
         pipe.execute()
+        finish_pipe_lock.release()
         ### From old CaptureStdOut.finished()
 
         data = {
