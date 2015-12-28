@@ -1,3 +1,12 @@
+"""
+The logic for tiempo's event loop.
+
+Twisted makes a looping call to cycle, which causes it to be running pretty much
+constantly. Which means any bugs in this module will have their consequence
+multiplied several times. cycle divides up its workload among several functions.
+The start function begins the event loop.
+"""
+
 import calendar
 from tiempo import TIEMPO_REGISTRY, all_runners
 
@@ -12,7 +21,6 @@ from tiempo.work import announce_tasks_to_client
 from tiempo.locks import schedule_lock
 
 logger = Logger()
-default_report_handler = None
 ps = REDIS.pubsub()
 
 
@@ -35,7 +43,9 @@ looper = task.LoopingCall(cycle)
 
 
 def glean_events_from_backend():
-    
+    """
+    Checks redis for pubsub events.
+    """
     try:
         events = hear_from_backend()
     except AttributeError, e:
@@ -80,7 +90,10 @@ def schedule_tasks_for_queueing():
 
 
 def queue_scheduled_tasks(backend_events):
-
+    """
+    Takes a list. Iterates over the events in the list. If they are both scheduled and expired,
+    calls task.spawn_job_and_run_soon.
+    """
     # TODO: What happens if this is running on the same machine?
     run_now = {}
     for task_string, task in TIEMPO_REGISTRY.items():

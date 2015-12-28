@@ -10,9 +10,9 @@ class JobReportingTests(TestCase):
     Tests for Job instances and report_handlers
     """
 
-    def __init__(self):
-        self.decorated = Trabajo()(some_callable)
-        self.simple_job = decorated.just_spawn_job()
+#    def __init__(self):
+    decorated = Trabajo()(some_callable)
+    simple_job = decorated.just_spawn_job()
 
     def setup(self):
         TIEMPO_REGISTRY.clear()
