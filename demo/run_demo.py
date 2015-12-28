@@ -63,7 +63,6 @@ application = get_wsgi_application()
 deployer = HendrixDeploy(options={'wsgi': application,
                                   'http_port': 4050,
                                   'loud': True,
-                                  'workers': 3,
                                   }
                          )
 
