@@ -118,7 +118,7 @@ def queue_scheduled_tasks(backend_events):
         for candidate, go_flag in run_now.items():
             if go_flag:
                 task = TIEMPO_REGISTRY[candidate]
-                queued_jobs[candidate] = task.spawn_job_and_run_soon(default_report_handler=default_report_handler)
+                queued_jobs[candidate] = task.spawn_job_and_run_soon()
             else:
                 queued_jobs[candidate] = False
 
