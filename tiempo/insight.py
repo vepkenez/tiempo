@@ -2,10 +2,15 @@ from collections import OrderedDict
 from redis.exceptions import ResponseError
 from tiempo.conn import REDIS
 import json
-
+from tiempo.locks import insight_pipe_lock
 
 def completed_jobs():
+    """
+    Takes no arguments, gets keys from redis, creates a pipeline and runs jobs,
+    and returns an ordered dictionary of keys and jobs.
+    """
 
+    insight_pipe_lock.acquire()
     keys = REDIS.keys('results*')
     pipe = REDIS.pipeline()
     for key in keys:
@@ -13,7 +18,9 @@ def completed_jobs():
 
     try:
         jobs_list = [job for job in pipe.execute()]
+        insight_pipe_lock.release()
     except ResponseError:
+        insight_pipe_lock.release()
         # TODO: Announce that one of the result keys didn't point to a hash and that we don't know what to do about it.
         raise
 

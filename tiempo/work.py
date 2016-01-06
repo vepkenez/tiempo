@@ -31,6 +31,7 @@ import json
 import random
 from twisted.logger import Logger
 logger = Logger()
+from tiempo.locks import finish_pipe_lock
 
 word_file = "/usr/share/dict/words"
 WORDS = open(word_file).read().splitlines()
@@ -53,6 +54,7 @@ class Job(object):
     '''
 
     def __init__(self, task, reconstitute_from=None, report_handler=None):
+
         self.task = task
 
         if reconstitute_from:
@@ -67,6 +69,7 @@ class Job(object):
             self.code_word = task.code_word
             self.status = 'waiting'
             self.enqueued = False
+            self.freeze(False)
 
         self.announcer = Announcer()
 
@@ -89,7 +92,7 @@ class Job(object):
              }
         return d
 
-    def _freeze(self, *args, **kwargs):
+    def freeze(self, make_frozen=True, *args, **kwargs):
 
         """
         creates a 'data' object which will be serialized and pushed into redis
@@ -108,12 +111,14 @@ class Job(object):
             'schedule': self.task.get_schedule(),
             'uid': self.uid,
             'codeWord': self.code_word,
+            'key': self.task.key,
+            'enqueued': self.enqueued,
         }
-        self.frozen = True
+        self.frozen = make_frozen
 
         return self.data
 
-    def _enqueue(self, queue_name):
+    def enqueue(self, queue_name=None):
         if not self.frozen:
             raise ValueError(
                 'need to freeze this task before enqueuing'
@@ -160,8 +165,8 @@ class Job(object):
 
         queue_name = job_list or self.task.group_key
 
-        self._freeze(*args, **kwargs)
-        self._enqueue(queue_name)
+        self.freeze(*args, **kwargs)
+        self.enqueue(queue_name)
         return self
 
     def now(self, *args, **kwargs):
@@ -179,7 +184,7 @@ class Job(object):
 
     def announce(self, channel):
         hxdispatcher.send(channel, {'jobs':
-                                        {self.uid: self.serialize_to_dict()}
+            {self.uid: self.serialize_to_dict()}
                                     })
 
     def start(self, error=None):
@@ -204,6 +209,7 @@ starting at %(start)s"""%data
         self.announce('job_queue')
 
     def finish(self, error=None):
+
         try:
             logger.info('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
         except AttributeError, e:
@@ -218,11 +224,13 @@ starting at %(start)s"""%data
         expire_time = int(((self.start_time + relativedelta(
             days=RESULT_LIFESPAN)) - self.start_time).total_seconds())
 
+        finish_pipe_lock.acquire()
         pipe = REDIS.pipeline()
         pipe.zadd(RECENT_KEY, self.start_time.strftime('%s'), task_key)
-        pipe.set(self.uid, self.serialize_to_dict())
+        pipe.set(self.uid, self.data)
         pipe.expire(self.uid, expire_time)
         pipe.execute()
+        finish_pipe_lock.release()
         ### From old CaptureStdOut.finished()
 
         data = {
@@ -646,6 +654,7 @@ class Trabajo(object):
         # TODO: Implement report handler
 
         job = Job(task=self)
+        
         return job
 
     def spawn_job_and_run_soon(self,

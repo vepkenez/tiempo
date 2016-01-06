@@ -5,17 +5,17 @@ A Procrastination Framework for Python
 ## Dev Setup
 
 ```bash
-virtualenv tiempo --no-site-packages --distributed
-source tiempo/bin/activate
+virtualenv env --no-site-packages --distributed
+source env/bin/activate
 pip install -e <path to your tiempo repo>
 ```
 
 Then to test this shit out just run:
 
 ```bash
-./tiempo/scripts/metronome
+python demo/run_demo.py
 ```
-
+Point your browser to 127.0.0.1:4050/tiempo_kiosk
 
 #### To use with Django/Hendrix
 
