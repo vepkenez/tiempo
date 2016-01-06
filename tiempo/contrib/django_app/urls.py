@@ -1,5 +1,5 @@
 from django.conf.urls import patterns, url
-from tiempo.contrib.django.views import TiempoKiosk
+from tiempo.contrib.django_app.views import TiempoKiosk
 
 urlpatterns = patterns(
     'tiempo.contrib.django.views',
