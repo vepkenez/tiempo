@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from tiempo.contrib.django.utils import six
+from django.utils import six
 
 from tiempo.conf import TASK_PATHS
 
