@@ -58,6 +58,8 @@ class ScheduleExpiryTests(TestCase):
 
         schedule_tasks_for_queueing()
         queued = forced_interval.currently_scheduled_keys()
+
+        # extract the list of unix timestamps from the redis scheduled keys
         orig_times = [int(key.split(':')[-1]) for key in queued]
         orig_times.sort()
 
@@ -70,13 +72,18 @@ class ScheduleExpiryTests(TestCase):
         # schedule again
         schedule_tasks_for_queueing()
         queued = forced_interval.currently_scheduled_keys()
+
+        # extract the list of unix timestamps from the redis scheduled keys
         times = [int(key.split(':')[-1]) for key in queued]
         times.sort()
 
         # there should be no new tasks scheduled
         self.assertEqual(len(queued), 100)
 
-        # the keys should NOT still be the same
+        # the keys should NOT still be the same because we have waited for a
+        # scheduled key to expire and re-run the `schedule_tasks_for_queueing`
+        # which would schedule a more recent scheduled key for this
+        # force_interval task
         self.assertNotEqual(orig_times, times)
         self.assertEqual(times[0] - orig_times[0], int_const)
 
