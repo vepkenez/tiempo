@@ -5,7 +5,7 @@ from hendrix.contrib.async.messaging import hxdispatcher
 
 from tiempo.announce import Announcer
 from tiempo.conf import RESULT_LIFESPAN, SCHEDULE_AHEAD_MINUTES, MAX_SCHEDULE_AHEAD_JOBS
-from tiempo.utils import utc_now, namespace, task_time_keys
+from tiempo.utils import utc_now, namespace
 
 
 try:
@@ -453,21 +453,6 @@ class Trabajo(object):
                     sched[i] = attr
 
             return '.'.join(sched)
-
-    def next_expiration_dt(self):
-        '''
-        The next future datetime at which this trabajo's waiting period will expire.
-        '''
-        if self.force_interval:
-            expiration_dt = utc_now() + datetime.timedelta(
-                seconds=self.force_interval
-            )
-        else:
-            run_times = task_time_keys()
-            schedule = self.get_schedule()
-            expiration_dt = run_times.get(self.get_schedule())
-
-        return expiration_dt
 
     def delta_until_run_time(self, dt=None):
         '''
