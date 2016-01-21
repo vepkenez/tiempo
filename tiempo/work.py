@@ -5,6 +5,7 @@ from hendrix.contrib.async.messaging import hxdispatcher
 
 from tiempo.announce import Announcer
 from tiempo.conf import RESULT_LIFESPAN, SCHEDULE_AHEAD_MINUTES, MAX_SCHEDULE_AHEAD_JOBS
+from tiempo.exceptions import JobDataError
 from tiempo.utils import utc_now, namespace
 
 
@@ -171,7 +172,7 @@ class Job(object):
 
     def now(self, *args, **kwargs):
         """
-        runs this task NOW with the args and kwargs
+        Run now, synchronously.
         """
         self.start()
 
@@ -213,8 +214,12 @@ starting at %(start)s"""%data
         try:
             logger.info('finished: %s (%s)' % (self.code_word, utc_now() - self.start_time))
         except AttributeError, e:
-            # Somehow this job finished without ever being started.
-            raise
+
+            if e.args[0] == "'Job' object has no attribute 'start_time'":
+                # Somehow this job finished without ever being started.
+                raise JobDataError("Finished without being started: %s" % self)
+            else:
+                raise
 
         self._enqueue_dependents()
 
@@ -275,7 +280,7 @@ starting at %(start)s"""%data
 
 class Trabajo(object):
     '''
-    espanol for task, and used interchangably with that word through Tiempo.
+    espanol for task, and used interchangably with that word throughout Tiempo.
 
     This is the center of Tiempo's work model.
 
@@ -685,8 +690,9 @@ class Trabajo(object):
 
     def now(self, *args, **kwargs):
         """
-        runs this task NOW with the args and kwargs
+        Backward compatilibty.
         """
+        # TODO: Issue deprecation warning.
         result = self.spawn_job_and_run_now(*args, **kwargs)
         return result
 
