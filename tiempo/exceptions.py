@@ -1,0 +1,2 @@
+class JobDataError(RuntimeError):
+    pass

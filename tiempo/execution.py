@@ -1,13 +1,9 @@
-from cStringIO import StringIO
-import sys
-import json
-
 import chalk
 from twisted.logger import Logger
 
 from tiempo import tiempo_loop
 from tiempo.runner import Runner
-from .conf import THREAD_CONFIG, DEBUG
+from .conf import THREAD_CONFIG
 from tiempo.utils import utc_now
 
 logger = Logger()
