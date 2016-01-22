@@ -115,7 +115,7 @@ class Runner(object):
         return task.run(runner=self)
 
     def cleanup(self, result):
-        """Takes a Runner instance and sanitizes it. !Destructive Function!"""
+        """A callback that takes a Runner instance and sanitizes it. !Destructive Function!"""
 
         self.current_job.finish()
 
@@ -126,7 +126,9 @@ class Runner(object):
         return  # And go back to cycling.
 
     def handle_success(self, return_value):
-
+        """
+        A callback to handle a successful running of a job
+        """
         self.finish_time = utc_now()
         runner_dict = self.serialize_to_dict()
 
@@ -139,10 +141,12 @@ class Runner(object):
         # TODO: Add some kind of trim here so that results:* don't grow huge.
         ##
 
-        return self.cleanup(return_value)
+        return
 
     def handle_error(self, failure):
-
+        """
+        A callback to handle a failed attempt at running a job
+        """
         self.finish_time = utc_now()
         self.error_state = True
         logger.info(failure.getBriefTraceback())  # TODO: What level do we want this to be?
@@ -155,7 +159,7 @@ class Runner(object):
         # TODO: Remove this, using only the backend push instead.
         # hxdispatcher.send('history', {'finished_runners': {self.current_job.uid: runner_dict}})
 
-        return self.cleanup(failure)
+        return
 
     def serialize_to_dict(self, alert=False):
 
