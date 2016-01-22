@@ -67,6 +67,7 @@ def let_runners_pick_up_queued_tasks():
             # If this is the case, it will have returned a Deferred.
             # We add our paths for success and failure here.
             result.addCallbacks(runner.handle_success, runner.handle_error)
+            result.addCallbacks(runner.cleanup)
 
         runner.announce('runners')  # The runner may have changed state; announce it.
 
