@@ -1,4 +1,5 @@
 import redis
+from itertools import islice
 from .conf import REDIS_HOST, REDIS_PORT, REDIS_QUEUE_DB, REDIS_PW
 
 
@@ -20,10 +21,13 @@ def subscribe_to_backend_notifications(db=REDIS_QUEUE_DB):
 
 def hear_from_backend():
     events = []
-    while True:
-        message = NOTIFY_PUBSUB.parse_response(block=False)
-        if message:
-            event = NOTIFY_PUBSUB.handle_message(message)
-            events.append(event)
-        else:
-            return events
+    def parse_backend():
+        try:
+            messages = NOTIFY_PUBSUB.parse_response()
+        except AttributeError:
+            messages = None
+        if messages:
+            for message in messages:
+                events.append(message)
+        return events
+    return parse_backend
