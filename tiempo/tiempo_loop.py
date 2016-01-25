@@ -46,12 +46,7 @@ def glean_events_from_backend():
     """
     Checks redis for pubsub events.
     """
-    try:
-        events = parse_backend()
-    except AttributeError, e:
-        if e.args[0] == "'NoneType' object has no attribute 'can_read'":
-            logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")
-        events = None
+    events = parse_backend()
     return events
 
 
