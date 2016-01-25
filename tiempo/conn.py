@@ -1,5 +1,4 @@
 import redis
-from itertools import islice
 from .conf import REDIS_HOST, REDIS_PORT, REDIS_QUEUE_DB, REDIS_PW
 
 
