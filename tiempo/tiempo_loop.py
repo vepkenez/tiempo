@@ -22,7 +22,7 @@ from tiempo.locks import schedule_lock
 
 logger = Logger()
 ps = REDIS.pubsub()
-
+parse_backend = hear_from_backend()
 
 def cycle():
     """This function runs in the event loop for tiempo"""
@@ -47,7 +47,7 @@ def glean_events_from_backend():
     Checks redis for pubsub events.
     """
     try:
-        events = hear_from_backend()
+        events = parse_backend()
     except AttributeError, e:
         if e.args[0] == "'NoneType' object has no attribute 'can_read'":
             logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")

@@ -38,8 +38,7 @@ class JobReportingTests(TestCase):
         self.assertRaises(ValueError, f=self.simple_job.enqueue)
 
     def test_job_finish_without_being_started_raises_error(self):
-        self.simple_job.finish()
-        self.assertRaises(JobDataError, completed_jobs)
+        self.assertRaises(JobDataError, self.simple_job.finish)
 
     def test_show_no_completed_jobs(self):
         cj = completed_jobs()
