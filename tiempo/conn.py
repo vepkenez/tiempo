@@ -23,7 +23,7 @@ def hear_from_backend():
     events = []
     def parse_backend():
         try:
-            message = NOTIFY_PUBSUB.parse_response()
+            message = NOTIFY_PUBSUB.parse_response(block=False)
         except AttributeError, e:
             if e.args[0] == "'NoneType' object has no attribute 'can_read'":
                 logger.warn("Tried to listen to redis pubsub that wasn't subscribed.")
