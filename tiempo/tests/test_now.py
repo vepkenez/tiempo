@@ -3,6 +3,7 @@ import datetime
 from twisted.trial.unittest import TestCase
 from twisted.internet.defer import Deferred
 from twisted.internet import reactor
+from tiempo import TIEMPO_REGISTRY
 from tiempo.work import Trabajo, Job
 from tiempo.tests.sample_tasks import some_callable
 from tiempo.runner import Runner, cleanup
@@ -36,3 +37,8 @@ class ExecutionTests(TestCase):
         decorated = Trabajo()(some_callable, True)
         self.assertTrue(decorated.spawn_job_and_run_now())
         self.assertTrue(decorated.now())
+
+    def test_setup_adds_task_to_tiempo_registry(self):
+        decorated = Trabajo()(some_callable, True)
+        value = TIEMPO_REGISTRY['tiempo.tests.sample_tasks.some_callable']
+        self.assertEqual(value, decorated())
