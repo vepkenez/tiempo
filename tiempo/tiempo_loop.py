@@ -79,7 +79,6 @@ def queue_scheduled_tasks(backend_events):
 
     # We now know which jobs need to be run.  Run them if marked.
     queued_jobs = queue_jobs(run_now)
-    TIEMPO_REGISTRY.update(queued_jobs)
     return
 
 def schedule_tasks_for_queueing():

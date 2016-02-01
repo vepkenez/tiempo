@@ -62,7 +62,7 @@ class EventsTests(TestCase):
         self.assertEqual(subscribe_event['type'], 'psubscribe')
 
         REDIS.set('results:whatever', 'tapestry needle')
-        
+
         try:
             set_event = check_backend()[0]
         except IndexError:
