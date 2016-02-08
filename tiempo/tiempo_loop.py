@@ -19,7 +19,7 @@ from tiempo.conn import REDIS, subscribe_to_backend_notifications, create_event_
 from tiempo.utils import namespace, utc_now
 from tiempo.work import announce_tasks_to_client
 from tiempo.locks import schedule_lock
-from tiempo.runner import cleanup
+from tiempo.runner import cleanup, cleanup_errors
 from tiempo.queueing import queue_expired_tasks, queue_jobs
 
 logger = Logger()
@@ -64,7 +64,8 @@ def let_runners_pick_up_queued_tasks():
             # If this is the case, it will have returned a Deferred.
             # We add our paths for success and failure here.
             result.addCallbacks(runner.handle_success, runner.handle_error)
-            result.addBoth(cleanup, (runner))
+            result.addCallback(cleanup, runner)
+            result.addErrback(cleanup_errors, runner)
 
         runner.announce('runners')  # The runner may have changed state; announce it.
     return
